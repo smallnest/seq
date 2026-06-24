@@ -133,6 +133,44 @@ func Flatten[T any](s Seq[Seq[T]]) Seq[T]            // receiver must be Seq[Seq
 
 The benefit of this rule is that it is **mechanically checkable**: take any API and ask "does it constrain `T` itself?" — if yes it must be a function, if no it can be a method. The inventory must not contain any entry that "constrains `T` yet is listed as a method".
 
+### Constrained subtypes: giving the chain back to Distinct/Max/Sum
+
+The rule has a side effect: once operations that constrain `T` become free functions, the pipeline goes back to reading inside-out. `seq.Sum(seq.Distinct(seq.From(xs)))` is the same nesting as the `lo` we set out to kill.
+
+The fix is to introduce three **constrained subtypes** that pin "the constraint on `T`" onto the type ahead of time, so their `Distinct`/`Max`/`Sum` can legitimately be methods:
+
+```go
+type SeqComparable[T comparable]  iter.Seq[T]   // .Distinct() .Contains() .CountValues() .ToSet() .Union() .Equal() …
+type SeqOrdered[T cmp.Ordered]    iter.Seq[T]   // .Max() .Min() .Sort()  + everything from Comparable
+type SeqNumeric[T Numeric]        iter.Seq[T]   // .Sum() .Product() .Mean() + everything from Ordered
+```
+
+The **entry into these types is still a free function** — that's a hard requirement of the rule, unavoidable. Because `Seq[T any]`'s `T` is `any`, converting it to `SeqComparable[T comparable]` amounts to requiring `any` to satisfy `comparable`, which only a constrained free function can do:
+
+```go
+func Comparable[T comparable](s Seq[T]) SeqComparable[T]
+func Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]
+func Numbers[T Numeric](s Seq[T]) SeqNumeric[T]   // name avoids the Numeric constraint itself
+```
+
+**But "downgrading" between constraints can be a method** — this is the key insight. Constraints form a hierarchy: `Numeric ⊂ Ordered ⊂ comparable` (numbers can be ordered, and can be compared for equality). A stronger constraint already satisfies a weaker one, so going from a stronger type to a weaker one doesn't re-constrain `T` and can hang as a method:
+
+```go
+func (s SeqNumeric[T]) Ordered() SeqOrdered[T]      // legal: Numeric satisfies Ordered
+func (s SeqOrdered[T]) Comparable() SeqComparable[T] // legal: Ordered satisfies comparable
+```
+
+Net effect: **a pipeline pays the free-function cost only once, at the entry, and is a method chain the whole way after — including the type conversions.**
+
+```go
+// Before: inside-out, two layers of wrapping
+sum := seq.Sum(seq.Distinct(seq.From(xs)))
+// After: one entry, then a full chain
+sum := seq.Numbers(seq.From(xs)).Distinct().Sum()
+```
+
+The cost, said in the open: the lazy operations that preserve `T` (`Filter`/`Take`/`Drop`/`TakeWhile`…) must be **re-exposed on each subtype** (returning the same type, so the chain doesn't break), which is this approach's main API-surface cost. `Map` changes `T` and returns a plain `Seq[U]`; call `Comparable()` again when needed.
+
 ### Boundaries: what shapes this library does not do
 
 - **No for-comprehension syntax sugar**; everything is a bare method chain.
@@ -154,7 +192,13 @@ The rejected option: `type Seq[T any] struct { it iter.Seq[T] }`. The temptation
 
 ### Why Distinct/Max/Sum are functions, not methods — this is not our choice
 
-Someone will ask "why not make `Distinct` into `s.Distinct()`, it's handier". The answer is: it can't be done, not that we don't want to. `Seq[T any]` declares `T` as `any` at the type level, and a method cannot add a `comparable` constraint onto `T` (a method's type parameters are fresh new parameters, they cannot reach back to constrain the receiver). This is a language rule, not API taste. All we can do is explain the rule clearly and provide "by key" method variants (`DistinctBy`) as an escape hatch, so common scenarios can still chain.
+Someone will ask "why not make `Distinct` into `s.Distinct()`, it's handier". The answer is: on `Seq[T any]` it can't be done, not that we don't want to. `Seq[T any]` declares `T` as `any` at the type level, and a method cannot add a `comparable` constraint onto `T` (a method's type parameters are fresh new parameters, they cannot reach back to constrain the receiver). This is a language rule, not API taste. We provide two escape hatches: "by key" method variants (`DistinctBy`), and the constrained subtypes above (`From(xs).Comparable().Distinct()`) — pin the constraint onto the type ahead of time and the method chain comes back. The free function `Distinct` on a bare `Seq[T]` is kept as a fallback for when you don't want to convert types.
+
+### Why the constrained-subtype entry is a function while downgrading is a method
+
+This is the asymmetry most open to challenge in the `SeqComparable`/`SeqOrdered`/`SeqNumeric` design. The rejected option: make `Comparable()` a method on `Seq[T]` too, so the whole path is free-function-free. It can't be done — `Seq[T any]`'s `T` is `any`, and a method returning `SeqComparable[T comparable]` amounts to requiring `any` to satisfy `comparable`, which won't compile. So the first hop from the `any` world into the constrained world must be a free function. Downgrading inside the constrained world (`Numeric → Ordered → comparable`) can be a method, because a stronger constraint already satisfies a weaker one and no new constraint on `T` is added. In one line: **cross a constraint boundary with a function, move within a constraint boundary with a method.** This is fully consistent with the rule, not an exception.
+
+The other rejected option: build only `SeqNumeric`. We didn't choose it, because then `Distinct` (needs only `comparable`) and `Max` (needs only `Ordered`) would either be forced into `SeqNumeric` (too strong a constraint — strings couldn't chain `Distinct`) or stay free functions (the chain breaks again). Three types aligned with three constraints let each operation land on the weakest constraint it actually needs.
 
 ### Why tuples cap at Tuple4 and don't follow Scala to Tuple22
 
@@ -181,9 +225,9 @@ Migration path: the library is itself opt-in — nobody is forced to depend on i
 
 Landing in three steps, each with a verifiable output (the local 1.27 RC is ready, so all three can be compiled and tested immediately):
 
-1. **Types and contract first.** Land the type definitions `Seq`/`Seq2`/`Pair`/`Tuple3`/`Tuple4`/`Numeric` and all **free functions** (`From`, `Distinct`, `Max`, `Zip`…) first, verifying the dividing rule holds. This batch does not depend on generic methods and, even split out on its own, compiles on Go 1.23+ as an independently publishable subset.
+1. **Types and contract first.** Land the type definitions `Seq`/`Seq2`/`Pair`/`Tuple3`/`Tuple4`/`Numeric` and all **free functions** (`From`, `Distinct`, `Max`, `Zip`, and the constrained-subtype entries `Comparable`/`Ordered`/`Numbers`…) first, verifying the dividing rule holds. This batch does not depend on generic methods and, even split out on its own, compiles on Go 1.23+ as an independently publishable subset.
 
-2. **The method-chain part.** Methods with method-level type parameters like `Map`/`Filter`/`FlatMap` depend on #77273 (Go 1.27), with "all unit tests pass on the 1.27 toolchain" as the done gate.
+2. **The method-chain part.** Methods with method-level type parameters like `Map`/`Filter`/`FlatMap`, plus the methods and downgrade methods on the constrained subtypes (`SeqComparable`/`SeqOrdered`/`SeqNumeric`), depend on #77273 (Go 1.27), with "all unit tests pass on the 1.27 toolchain" as the done gate.
 
 3. **Generate the authoritative API.md.** Partitioned by "method / free function", listing every signature plus a one-line semantic, with each free function annotated by the reason it cannot be a method (constrains T / multiple type params / nested instantiation). Documentation and code signatures cross-checked by hand.
 
@@ -197,7 +241,10 @@ The free-function set from step 1 is itself a subset that compiles independently
 A: `lo` solves "do these operations exist"; this library solves "can you chain them left-to-right, lazily". Different positioning; `lo`'s full capability set cannot chain before 1.27, which is precisely this library's entry point.
 
 **Q: Why do `SumBy` (method) and `Sum` (function) coexist?**
-A: `Sum[T Numeric]` constrains `T` itself and can only be a function; `SumBy[U Numeric](f func(T) U)` lands its constraint on the method's own `U` and can be a method. Naming convention: `By` = aggregate by projected value (method), `ByKey` = take the extreme by projected key (method), bare `Max`/`Min`/`Sum` = functions that constrain T.
+A: `Sum[T Numeric]` constrains `T` itself and on a bare `Seq[T]` can only be a function; `SumBy[U Numeric](f func(T) U)` lands its constraint on the method's own `U` and can be a method. Naming convention: `By` = aggregate by projected value (method), `ByKey` = take the extreme by projected key (method), bare `Max`/`Min`/`Sum` = functions that constrain T. To call `Sum` in a chain, convert the sequence to `SeqNumeric`: `From(xs).Numbers().Sum()`.
+
+**Q: Constrained subtypes (SeqComparable/SeqOrdered/SeqNumeric) vs. bare Seq — which do I use?**
+A: Default to `Seq[T]`. When you want to chain `Sum`/`Max`/`Distinct` over numeric/comparable/ordered elements, convert once with an entry function (`Numbers`/`Ordered`/`Comparable`), then it's a full method chain — and you can switch among the three with downgrade methods (`Numbers().Ordered().Comparable()`). When you don't want to convert types, the free-function versions on a bare `Seq[T]` (`Sum(s)`/`Distinct(s)`) remain available.
 
 **Q: What about performance?**
 A: A deep chain is nested `yield` closure calls, and a hot inner loop may not match a hand-written loop. This library's selling point is readability and composability, not peak performance. API.md will note the applicability boundaries.

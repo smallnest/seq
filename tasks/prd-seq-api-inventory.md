@@ -15,10 +15,11 @@
 
 这是整个库设计的中心规则，所有划分都源于此：
 
-1. **方法的类型参数是全新、独立的，不能给接收者的 `T` 追加约束。** `Seq[T any]` 在类型层把 `T` 声明为 `any`，因此任何要求**元素本身**满足 `comparable` / `cmp.Ordered` / 数值约束的操作**不能做成方法**，只能是自由函数。例：`Distinct`（需 `comparable`）、`Max`（需 `Ordered`）、`Sum`（需 `Numeric`）。
-2. **逃生舱：方法自己的类型参数可以带约束。** 所以"按 key"的变体能回到方法形态。例：`DistinctBy[K comparable](key func(T) K)`、`GroupBy[K comparable]`，因为 `K` 是方法自己的参数，不是接收者的 `T`。
-3. **涉及多个发生器类型或特定实例化接收者的操作只能是自由函数。** 例：`Zip[A, B](a Seq[A], b Seq[B])`（两个独立类型）、`Flatten[T](s Seq[Seq[T]])`（接收者必须是 `Seq[Seq[T]]` 这一具体实例化，方法无法泛型地挂上去）。
-4. **泛型方法不满足接口**（提案的硬线）——本库不尝试提供集合的多态接口抽象。
+1. **方法的类型参数是全新、独立的，不能给接收者的 `T` 追加约束。** `Seq[T any]` 在类型层把 `T` 声明为 `any`，因此任何要求**元素本身**满足 `comparable` / `cmp.Ordered` / 数值约束的操作**不能做成 `Seq[T]` 的方法**，只能是自由函数。例：`Distinct`（需 `comparable`）、`Max`（需 `Ordered`）、`Sum`（需 `Numeric`）。
+2. **逃生舱一：方法自己的类型参数可以带约束。** 所以"按 key"的变体能回到方法形态。例：`DistinctBy[K comparable](key func(T) K)`、`GroupBy[K comparable]`，因为 `K` 是方法自己的参数，不是接收者的 `T`。
+3. **逃生舱二：约束型子类型把约束钉在类型上，恢复链式。** 引入 `SeqComparable[T comparable]` / `SeqOrdered[T cmp.Ordered]` / `SeqNumeric[T Numeric]`，其上的 `Distinct`/`Max`/`Sum` 是方法。进入这些类型的入口（`Comparable`/`Ordered`/`Numbers`）必须是自由函数（约束 `T`），但约束间降级（`Numeric→Ordered→comparable`）可做成方法，因强约束满足弱约束。详见 FR-8。
+4. **涉及多个发生器类型或特定实例化接收者的操作只能是自由函数。** 例：`Zip[A, B](a Seq[A], b Seq[B])`（两个独立类型）、`Flatten[T](s Seq[Seq[T]])`（接收者必须是 `Seq[Seq[T]]` 这一具体实例化，方法无法泛型地挂上去）。
+5. **泛型方法不满足接口**（提案的硬线）——本库不尝试提供集合的多态接口抽象。
 
 ### 已知的能力边界（相对 Scala）
 
@@ -115,12 +116,24 @@
 - [ ] `FromMap`/`Enumerate` 入口可用
 - [ ] 单元测试覆盖，`go test ./...` 通过
 
-### US-008: API 清单文档与划分理由表
+### US-008: 约束型子类型与链式恢复（SeqComparable / SeqOrdered / SeqNumeric）
+**Description:** 作为使用者，我需要在数值/可比较/可排序元素上链式调用 `Sum`/`Max`/`Distinct`，而不必退回从内往外的自由函数嵌套。
+
+**Acceptance Criteria:**
+- [ ] 实现 FR-8 列出的三个约束型子类型及其方法、入口函数、降级方法
+- [ ] 入口为自由函数：`Comparable`/`Ordered`/`Numbers` 把 `Seq[T]` 转成对应子类型
+- [ ] 降级为方法：`SeqNumeric.Ordered()`、`SeqOrdered.Comparable()` 编译通过
+- [ ] `Numbers(From([]int{1,2,3})).Distinct().Sum()` 全程链式且结果正确
+- [ ] 保持 `T` 的中间方法（`Filter`/`Take` 等）在子类型上返回同类型，链不断
+- [ ] 单元测试覆盖（含 string 走 `Comparable().Distinct()`、float 走 `Numbers().Mean()`），`go test ./...` 通过
+
+### US-009: API 清单文档与划分理由表
 **Description:** 作为维护者与下游，我需要一份权威的 API 清单文档，逐条标注归属与理由，作为契约。
 
 **Acceptance Criteria:**
 - [ ] 项目内生成 `API.md`，按"方法 / 自由函数"分区列出全部 API 签名 + 一句语义
 - [ ] 每个"自由函数"条目注明为何不能是方法（约束 T / 多类型 / 嵌套实例化）
+- [ ] 约束型子类型一节说明"入口为函数、降级为方法"的理由
 - [ ] 文档与代码签名一致（可人工核对）
 - [ ] Markdown 渲染无格式错误
 
@@ -282,8 +295,36 @@
 | `Entries[K, V any](pairs []Pair[K, V]) Seq2[K, V]` | 从 Pair slice 创建 |
 | `Associate[T any, K comparable, V any](s Seq[T], f func(T) (K, V)) Seq2[K, V]` | 由 `Seq[T]` 经 `f` 投影为 `Seq2[K,V]`（收口 Open Question；约束 K，故为自由函数） |
 
-### FR-8: 文档
-- FR-8: 系统须在项目根生成 `API.md`，按"方法 / 自由函数"分区列出全部 API 的签名与一句语义，自由函数须注明无法成为方法的原因类别。
+### FR-8: 约束型子类型（把约束钉在类型上以恢复链式）
+- FR-8a: 系统须定义三个约束型子类型（均为 `iter.Seq[T]` 的定义类型）：
+
+| 类型 | 约束 | 其上的约束型方法 |
+|---|---|---|
+| `SeqComparable[T comparable]` | `comparable` | `Distinct()`、`Contains(v)`、`IndexOf(v)`、`CountValues()`、`ToSet()`、`Union(others...)`、`Intersect(o)`、`Difference(o)`、`Equal(o)` |
+| `SeqOrdered[T cmp.Ordered]` | `cmp.Ordered` | `Max()`、`Min()`、`Sort()`（外加继承自 comparable 的全部） |
+| `SeqNumeric[T Numeric]` | `Numeric` | `Sum()`、`Product()`、`Mean()`（外加继承自 ordered 的全部） |
+
+- FR-8b: 系统须提供进入这些类型的**入口自由函数**（约束 `T`，故为函数）：
+
+| 函数 | 语义 |
+|---|---|
+| `Comparable[T comparable](s Seq[T]) SeqComparable[T]` | 转为可比较序列 |
+| `Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]` | 转为可排序序列 |
+| `Numbers[T Numeric](s Seq[T]) SeqNumeric[T]` | 转为数值序列（名字避开 `Numeric` 约束本身） |
+
+- FR-8c: 系统须提供约束间的**降级方法**（强约束满足弱约束，故可为方法）：
+
+| 方法 | 语义 |
+|---|---|
+| `(SeqNumeric[T]) Ordered() SeqOrdered[T]` | 降级为可排序序列 |
+| `(SeqOrdered[T]) Comparable() SeqComparable[T]` | 降级为可比较序列 |
+| `(SeqComparable[T]) Seq() Seq[T]` | 退回裸序列（用于 `Map` 等改变 T 的操作前） |
+
+- FR-8d: 系统须在每个子类型上**重新暴露保持 `T` 的中间方法**（`Filter`/`Reject`/`Take`/`Drop`/`TakeWhile`/`DropWhile`/`Peek` 等），返回同一子类型，使链不断。改变 `T` 的 `Map`/`FlatMap` 不在子类型上提供，需先 `Seq()` 退回裸序列。
+- FR-8e: 裸 `Seq[T]` 上的等价自由函数（FR-5 的 `Distinct`/`Max`/`Sum` 等）保留，作为不转类型时的兜底，与子类型方法语义一致。
+
+### FR-9: 文档
+- FR-9: 系统须在项目根生成 `API.md`，按"方法 / 自由函数"分区列出全部 API 的签名与一句语义，自由函数须注明无法成为方法的原因类别，并设专节说明约束型子类型"入口为函数、降级为方法"的规则。
 
 ## Non-Goals (Out of Scope)
 
@@ -310,9 +351,9 @@
 
 ## Success Metrics
 
-- API 清单 100% 覆盖 FR-2 至 FR-7 列出的条目，无遗漏。
-- 每个自由函数都能对应到三类判定理由之一（约束 T / 多类型参数 / 嵌套实例化）。
-- 划分规则可机械复核：清单中不存在"约束 T 本身却被列为方法"的条目。
+- API 清单 100% 覆盖 FR-2 至 FR-9 列出的条目，无遗漏。
+- 每个裸 `Seq[T]` 上的自由函数都能对应到三类判定理由之一（约束 T / 多类型参数 / 嵌套实例化）。
+- 划分规则可机械复核：裸 `Seq[T]` 的清单中不存在"约束 T 本身却被列为方法"的条目；约束型子类型上的方法均满足"约束已钉在类型上"或"降级到弱约束"。
 - 下游可直接据此清单运行 `/to-issues` 拆分为可实现 Issue，无需二次澄清 API 形态。
 
 ## Open Questions

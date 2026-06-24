@@ -7,11 +7,9 @@ English | [简体中文](README_CN.md)
 `seq` is a generic Go library that wraps the standard library's lazy iterators `iter.Seq` / `iter.Seq2` (Go 1.23+) and gives them Scala-style, left-to-right, chainable operations:
 
 ```go
-sum := seq.SumBy(
-    seq.From([]int{1, 2, 3, 4, 5, 6}).
-        Filter(func(x int) bool { return x%2 == 0 }).
-        Map(func(x int) int { return x * x }),
-)
+sum := seq.From([]int{1, 2, 3, 4, 5, 6}).
+    Filter(func(x int) bool { return x%2 == 0 }).
+    SumBy(func(x int) int { return x * x })
 ```
 
 > ⚠️ **This library requires Go 1.27.** The chainable methods depend on the generic methods proposal ([golang/go#77273](https://github.com/golang/go/issues/77273)), which **has been accepted** and is implemented in Go 1.27. A 1.27 toolchain (currently `go1.27rc1`) is required to build. See [Status](#status) below.
@@ -86,6 +84,7 @@ The rule is mechanically checkable: ask "does it constrain `T` itself?" If yes, 
 | Intermediate (lazy) | methods | `Map`, `Filter`, `FlatMap`, `FilterMap`, `Reject`, `Take`/`Drop`, `TakeWhile`/`DropWhile`, `Scan`, `Chunk`, `Window`, `DistinctBy`, `Enumerate` |
 | Terminal | methods | `Collect`, `Fold`, `Reduce`, `Find`, `Any`/`All`/`None`, `GroupBy`, `KeyBy`, `Partition`, `SumBy`, `MaxByKey`, `Join` |
 | Constrained | free functions | `Distinct`, `Contains`, `Max`/`Min`, `Sum`/`Product`/`Mean`, `Sort`, `Union`/`Intersect`/`Difference`, `Compact`, `Without` |
+| Constrained subtypes | functions (entry) + methods | `Comparable`/`Ordered`/`Numbers` enter; then chain `.Distinct()`, `.Max()`, `.Sum()`; downgrade with `.Ordered()`/`.Comparable()` |
 | Multi-sequence | free functions | `Zip`/`Zip3`/`Zip4`, `ZipWith`, `ZipMap`, `Unzip`, `Flatten`, `Concat`, `Interleave` |
 | `Seq2[K,V]` | methods + functions | `MapValues`, `MapKeys`, `Keys`, `Values`; `ToMap`, `CollectPairs`, `Associate` |
 

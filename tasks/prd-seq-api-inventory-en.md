@@ -15,10 +15,11 @@ This document **produces an API inventory only**: a complete listing of the meth
 
 This is the central rule of the whole library; every split derives from it:
 
-1. **A method's type parameters are fresh and independent; they cannot add a constraint onto the receiver's `T`.** `Seq[T any]` declares `T` as `any` at the type level, so any operation that requires **the element itself** to satisfy `comparable` / `cmp.Ordered` / a numeric constraint **cannot be a method**, only a free function. Examples: `Distinct` (needs `comparable`), `Max` (needs `Ordered`), `Sum` (needs `Numeric`).
-2. **Escape hatch: a method's own type parameters may carry constraints.** So "by key" variants can return to method form. Examples: `DistinctBy[K comparable](key func(T) K)`, `GroupBy[K comparable]`, because `K` is the method's own parameter, not the receiver's `T`.
-3. **Operations involving multiple generator types or a specific instantiated receiver can only be free functions.** Examples: `Zip[A, B](a Seq[A], b Seq[B])` (two independent types), `Flatten[T](s Seq[Seq[T]])` (the receiver must be the specific instantiation `Seq[Seq[T]]`, which a method cannot generically attach to).
-4. **Generic methods do not satisfy interfaces** (a hard line of the proposal) — this library does not attempt to provide a polymorphic interface abstraction over collections.
+1. **A method's type parameters are fresh and independent; they cannot add a constraint onto the receiver's `T`.** `Seq[T any]` declares `T` as `any` at the type level, so any operation that requires **the element itself** to satisfy `comparable` / `cmp.Ordered` / a numeric constraint **cannot be a method on `Seq[T]`**, only a free function. Examples: `Distinct` (needs `comparable`), `Max` (needs `Ordered`), `Sum` (needs `Numeric`).
+2. **Escape hatch 1: a method's own type parameters may carry constraints.** So "by key" variants can return to method form. Examples: `DistinctBy[K comparable](key func(T) K)`, `GroupBy[K comparable]`, because `K` is the method's own parameter, not the receiver's `T`.
+3. **Escape hatch 2: constrained subtypes pin the constraint onto the type, restoring chaining.** Introduce `SeqComparable[T comparable]` / `SeqOrdered[T cmp.Ordered]` / `SeqNumeric[T Numeric]`, on which `Distinct`/`Max`/`Sum` are methods. The entry into these types (`Comparable`/`Ordered`/`Numbers`) must be a free function (constrains `T`), but downgrading between constraints (`Numeric→Ordered→comparable`) can be a method, because a stronger constraint satisfies a weaker one. See FR-8.
+4. **Operations involving multiple generator types or a specific instantiated receiver can only be free functions.** Examples: `Zip[A, B](a Seq[A], b Seq[B])` (two independent types), `Flatten[T](s Seq[Seq[T]])` (the receiver must be the specific instantiation `Seq[Seq[T]]`, which a method cannot generically attach to).
+5. **Generic methods do not satisfy interfaces** (a hard line of the proposal) — this library does not attempt to provide a polymorphic interface abstraction over collections.
 
 ### Known capability boundaries (relative to Scala)
 
@@ -115,12 +116,24 @@ This is the central rule of the whole library; every split derives from it:
 - [ ] `FromMap`/`Enumerate` entry points are available
 - [ ] Unit tests cover, `go test ./...` passes
 
-### US-008: API inventory document and split-rationale table
+### US-008: Constrained subtypes and chain restoration (SeqComparable / SeqOrdered / SeqNumeric)
+**Description:** As a user, I want to chain `Sum`/`Max`/`Distinct` over numeric/comparable/ordered elements without falling back to inside-out free-function nesting.
+
+**Acceptance Criteria:**
+- [ ] Implement the three constrained subtypes listed in FR-8, with their methods, entry functions, and downgrade methods
+- [ ] Entries are free functions: `Comparable`/`Ordered`/`Numbers` convert `Seq[T]` to the corresponding subtype
+- [ ] Downgrades are methods: `SeqNumeric.Ordered()`, `SeqOrdered.Comparable()` compile
+- [ ] `Numbers(From([]int{1,2,3})).Distinct().Sum()` chains fully and is correct
+- [ ] `T`-preserving intermediate methods (`Filter`/`Take` etc.) return the same subtype, so the chain doesn't break
+- [ ] Unit tests cover (incl. strings via `Comparable().Distinct()`, floats via `Numbers().Mean()`), `go test ./...` passes
+
+### US-009: API inventory document and split-rationale table
 **Description:** As a maintainer and downstream consumer, I need an authoritative API inventory document, annotating each entry with its classification and reason, as a contract.
 
 **Acceptance Criteria:**
 - [ ] Generate `API.md` in the project, listing every API signature + one-line semantic, partitioned into "method / free function"
 - [ ] Each "free function" entry notes why it cannot be a method (constrains T / multiple types / nested instantiation)
+- [ ] A dedicated section explains the constrained-subtype rule of "entry is a function, downgrade is a method"
 - [ ] The document matches the code signatures (manually verifiable)
 - [ ] Markdown renders without formatting errors
 
@@ -282,8 +295,36 @@ This is the central rule of the whole library; every split derives from it:
 | `Entries[K, V any](pairs []Pair[K, V]) Seq2[K, V]` | Create from a Pair slice |
 | `Associate[T any, K comparable, V any](s Seq[T], f func(T) (K, V)) Seq2[K, V]` | Project `Seq[T]` via `f` into `Seq2[K,V]` (closes the Open Question; constrains K, so a free function) |
 
-### FR-8: Documentation
-- FR-8: The system shall generate `API.md` at the project root, listing every API's signature and one-line semantic partitioned into "method / free function", with free functions annotated by the reason category they cannot be methods.
+### FR-8: Constrained subtypes (pin the constraint onto the type to restore chaining)
+- FR-8a: The system shall define three constrained subtypes (all defined types of `iter.Seq[T]`):
+
+| Type | Constraint | Constrained methods on it |
+|---|---|---|
+| `SeqComparable[T comparable]` | `comparable` | `Distinct()`, `Contains(v)`, `IndexOf(v)`, `CountValues()`, `ToSet()`, `Union(others...)`, `Intersect(o)`, `Difference(o)`, `Equal(o)` |
+| `SeqOrdered[T cmp.Ordered]` | `cmp.Ordered` | `Max()`, `Min()`, `Sort()` (plus everything inherited from comparable) |
+| `SeqNumeric[T Numeric]` | `Numeric` | `Sum()`, `Product()`, `Mean()` (plus everything inherited from ordered) |
+
+- FR-8b: The system shall provide **entry free functions** into these types (constrain `T`, so functions):
+
+| Function | Semantic |
+|---|---|
+| `Comparable[T comparable](s Seq[T]) SeqComparable[T]` | Convert to a comparable sequence |
+| `Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]` | Convert to an ordered sequence |
+| `Numbers[T Numeric](s Seq[T]) SeqNumeric[T]` | Convert to a numeric sequence (name avoids the `Numeric` constraint itself) |
+
+- FR-8c: The system shall provide **downgrade methods** between constraints (a stronger constraint satisfies a weaker one, so these can be methods):
+
+| Method | Semantic |
+|---|---|
+| `(SeqNumeric[T]) Ordered() SeqOrdered[T]` | Downgrade to an ordered sequence |
+| `(SeqOrdered[T]) Comparable() SeqComparable[T]` | Downgrade to a comparable sequence |
+| `(SeqComparable[T]) Seq() Seq[T]` | Drop back to a bare sequence (before `Map` and other `T`-changing operations) |
+
+- FR-8d: The system shall **re-expose the `T`-preserving intermediate methods** (`Filter`/`Reject`/`Take`/`Drop`/`TakeWhile`/`DropWhile`/`Peek` etc.) on each subtype, returning the same subtype so the chain doesn't break. The `T`-changing `Map`/`FlatMap` are not provided on subtypes; call `Seq()` to drop back to a bare sequence first.
+- FR-8e: The equivalent free functions on a bare `Seq[T]` (FR-5's `Distinct`/`Max`/`Sum` etc.) are kept as a fallback for when you don't want to convert types, with semantics consistent with the subtype methods.
+
+### FR-9: Documentation
+- FR-9: The system shall generate `API.md` at the project root, listing every API's signature and one-line semantic partitioned into "method / free function", with free functions annotated by the reason category they cannot be methods, and a dedicated section explaining the constrained-subtype rule of "entry is a function, downgrade is a method".
 
 ## Non-Goals (Out of Scope)
 
@@ -308,9 +349,9 @@ This is the central rule of the whole library; every split derives from it:
 
 ## Success Metrics
 
-- The API inventory covers 100% of the entries listed in FR-2 through FR-7, with no omissions.
-- Every free function maps to one of the three classification reasons (constrains T / multiple type params / nested instantiation).
-- The split rule is mechanically auditable: the inventory contains no entry that "constrains T itself yet is listed as a method".
+- The API inventory covers 100% of the entries listed in FR-2 through FR-9, with no omissions.
+- Every free function on a bare `Seq[T]` maps to one of the three classification reasons (constrains T / multiple type params / nested instantiation).
+- The split rule is mechanically auditable: the bare-`Seq[T]` inventory contains no entry that "constrains T itself yet is listed as a method"; methods on the constrained subtypes all satisfy "constraint pinned on the type" or "downgrade to a weaker constraint".
 - Downstream can run `/to-issues` directly from this inventory to decompose into implementable Issues, with no second round of clarification on API shape.
 
 ## Open Questions

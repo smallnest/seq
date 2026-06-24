@@ -131,6 +131,45 @@ func Flatten[T any](s Seq[Seq[T]]) Seq[T]            // 接收者须为 Seq[Seq[
 ```
 
 这条规则的好处是**可机械验证**：拿任何一个 API，问"它约束了 `T` 本身吗"——约束了就必须是函数，没约束就可以是方法。清单里不允许出现"约束了 `T` 却被列为方法"的条目。
+
+### 约束型子类型：把链式还给 Distinct/Max/Sum
+
+铁律有个副作用：约束 `T` 的操作沦为自由函数后，管道又退回从内往外读。`seq.Sum(seq.Distinct(seq.From(xs)))` 和我们想消灭的 `lo` 嵌套是一回事。
+
+解法是引入三个**约束型子类型**，把"对 `T` 的约束"提前钉在类型上，这样它们的 `Distinct`/`Max`/`Sum` 就能名正言顺地做成方法：
+
+```go
+type SeqComparable[T comparable]  iter.Seq[T]   // .Distinct() .Contains() .CountValues() .ToSet() .Union() .Equal() …
+type SeqOrdered[T cmp.Ordered]    iter.Seq[T]   // .Max() .Min() .Sort()  + 继承 Comparable 的全部
+type SeqNumeric[T Numeric]        iter.Seq[T]   // .Sum() .Product() .Mean() + 继承 Ordered 的全部
+```
+
+进入这些类型的**入口仍是自由函数**——这是铁律的硬要求，无法绕过。因为 `Seq[T any]` 的 `T` 是 `any`，把它转成 `SeqComparable[T comparable]` 等于要求 `any` 满足 `comparable`，只能由一个带约束的自由函数完成：
+
+```go
+func Comparable[T comparable](s Seq[T]) SeqComparable[T]
+func Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]
+func Numbers[T Numeric](s Seq[T]) SeqNumeric[T]   // 名字避开 Numeric 约束本身
+```
+
+**但约束之间的"降级"可以是方法**——这是关键洞察。约束有层级：`Numeric ⊂ Ordered ⊂ comparable`（数值都可比大小、都可比相等）。强约束天然满足弱约束，所以从强类型降到弱类型不需要重新约束 `T`，可以挂成方法：
+
+```go
+func (s SeqNumeric[T]) Ordered() SeqOrdered[T]      // 合法：Numeric 满足 Ordered
+func (s SeqOrdered[T]) Comparable() SeqComparable[T] // 合法：Ordered 满足 comparable
+```
+
+净效果：**一条管道只在入口付一次自由函数的代价，之后全程方法链**，包括类型间转换。
+
+```go
+// 旧：从内往外，两层包裹
+sum := seq.Sum(seq.Distinct(seq.From(xs)))
+// 新：一次入口，之后全链式
+sum := seq.Numbers(seq.From(xs)).Distinct().Sum()
+```
+
+代价要说在明处：保持 `T` 的惰性操作（`Filter`/`Take`/`Drop`/`TakeWhile`…）必须在每个子类型上**重新暴露一遍**（返回同类型，链才不断），这是本方案主要的 API 面成本。`Map` 改变 `T`，回到普通 `Seq[U]`，需要时再 `Comparable()` 一次。
+
 ### 边界：这个库不做什么形态的事
 
 - **没有 for-comprehension 语法糖**，一切都是裸方法链。
@@ -152,7 +191,13 @@ func Flatten[T any](s Seq[Seq[T]]) Seq[T]            // 接收者须为 Seq[Seq[
 
 ### 为什么 Distinct/Max/Sum 是函数而不是方法——这不是我们的选择
 
-有人会问"为什么不把 `Distinct` 做成 `s.Distinct()`，多顺手"。答案是：做不到，不是不想。`Seq[T any]` 在类型层声明 `T` 为 `any`，方法无法给 `T` 追加 `comparable` 约束（方法的类型参数是独立的新参数，不能回头约束接收者）。这是语言规则，不是 API 品味。我们能做的只是把规则讲透，并提供"按 key"的方法变体（`DistinctBy`）作为逃生舱，让常见场景仍能链下去。
+有人会问"为什么不把 `Distinct` 做成 `s.Distinct()`，多顺手"。答案是：在 `Seq[T any]` 上做不到，不是不想。`Seq[T any]` 在类型层声明 `T` 为 `any`，方法无法给 `T` 追加 `comparable` 约束（方法的类型参数是独立的新参数，不能回头约束接收者）。这是语言规则，不是 API 品味。我们提供两条逃生舱："按 key"的方法变体（`DistinctBy`），以及上文的约束型子类型（`From(xs).Comparable().Distinct()`）——把约束提前钉在类型上，方法链就回来了。裸 `Seq[T]` 上的自由函数 `Distinct` 仍保留，作为不想转类型时的兜底。
+
+### 为什么约束型子类型的入口是函数、降级是方法
+
+这是 `SeqComparable`/`SeqOrdered`/`SeqNumeric` 设计里最容易被质疑的不对称。被放弃的方案：把 `Comparable()` 也做成 `Seq[T]` 的方法，让全程零自由函数。做不到——`Seq[T any]` 的 `T` 是 `any`，方法返回 `SeqComparable[T comparable]` 等于要求 `any` 满足 `comparable`，编译不过。所以从 `any` 世界进入约束世界的第一跳必须由自由函数完成。而约束世界内部的降级（`Numeric → Ordered → comparable`）能做成方法，是因为强约束已满足弱约束，无需对 `T` 追加新约束。一句话：**跨越约束边界用函数，约束边界之内用方法。** 这与铁律完全一致，不是例外。
+
+被放弃的另一方案：只做 `SeqNumeric` 一个类型。我们没选，因为那样 `Distinct`（只需 `comparable`）和 `Max`（只需 `Ordered`）要么被迫塞进 `SeqNumeric`（约束过强，字符串就用不了 `Distinct` 链），要么继续当自由函数（链又断）。三层类型对齐三层约束，才能让每个操作落在它真正需要的最弱约束上。
 
 ### 为什么元组封顶 Tuple4，不学 Scala 做到 Tuple22
 
@@ -179,9 +224,9 @@ func Flatten[T any](s Seq[Seq[T]]) Seq[T]            // 接收者须为 Seq[Seq[
 
 落地分三步，每步都有可验证的产出（本地 1.27 RC 已就绪，三步均可立即编译测试）：
 
-1. **类型与契约先行。** 先落地 `Seq`/`Seq2`/`Pair`/`Tuple3`/`Tuple4`/`Numeric` 类型定义和全部**自由函数**（`From`、`Distinct`、`Max`、`Zip`…），验证划分铁律站得住。这一批不依赖泛型方法，即便单独抽出也能在 Go 1.23+ 编译，可作为可独立发布的子集。
+1. **类型与契约先行。** 先落地 `Seq`/`Seq2`/`Pair`/`Tuple3`/`Tuple4`/`Numeric` 类型定义和全部**自由函数**（`From`、`Distinct`、`Max`、`Zip`、约束型子类型入口 `Comparable`/`Ordered`/`Numbers`…），验证划分铁律站得住。这一批不依赖泛型方法，即便单独抽出也能在 Go 1.23+ 编译，可作为可独立发布的子集。
 
-2. **方法链部分。** `Map`/`Filter`/`FlatMap` 等带方法级类型参数的方法依赖 #77273（Go 1.27），以"全部单测在 1.27 工具链通过"为完成门禁。
+2. **方法链部分。** `Map`/`Filter`/`FlatMap` 等带方法级类型参数的方法，以及约束型子类型（`SeqComparable`/`SeqOrdered`/`SeqNumeric`）上的方法与降级方法，依赖 #77273（Go 1.27），以"全部单测在 1.27 工具链通过"为完成门禁。
 
 3. **生成权威 API.md。** 按"方法 / 自由函数"分区列出全部签名 + 一句语义，每个自由函数注明它无法成为方法的原因类别（约束 T / 多类型参数 / 嵌套实例化）。文档与代码签名人工核对一致。
 
@@ -195,7 +240,10 @@ func Flatten[T any](s Seq[Seq[T]]) Seq[T]            // 接收者须为 Seq[Seq[
 A：`lo` 解决的是"有没有这些操作"，本库解决的是"能不能从左到右链着写、且惰性"。两者定位不同；`lo` 的全部能力在 1.27 之前是链不起来的，这正是本库的切入点。
 
 **Q：`SumBy`（方法）和 `Sum`（函数）为什么并存？**
-A：`Sum[T Numeric]` 约束 `T` 本身，只能是函数；`SumBy[U Numeric](f func(T) U)` 的约束落在方法自带的 `U` 上，可以是方法。命名约定：`By` = 按投影值聚合（方法），`ByKey` = 按投影 key 取极值（方法），裸 `Max`/`Min`/`Sum` = 约束 T 的函数。
+A：`Sum[T Numeric]` 约束 `T` 本身，在裸 `Seq[T]` 上只能是函数；`SumBy[U Numeric](f func(T) U)` 的约束落在方法自带的 `U` 上，可以是方法。命名约定：`By` = 按投影值聚合（方法），`ByKey` = 按投影 key 取极值（方法），裸 `Max`/`Min`/`Sum` = 约束 T 的函数。若想链式调用 `Sum`，把序列转成 `SeqNumeric` 即可：`From(xs).Numbers().Sum()`。
+
+**Q：约束型子类型（SeqComparable/SeqOrdered/SeqNumeric）和裸 Seq 怎么选？**
+A：默认用 `Seq[T]`。当你要在数值/可比较/可排序元素上链式调用 `Sum`/`Max`/`Distinct` 时，用一次入口函数（`Numbers`/`Ordered`/`Comparable`）转过去，之后全程方法链，还能用降级方法在三者间切换（`Numbers().Ordered().Comparable()`）。不想转类型时，裸 `Seq[T]` 上的自由函数版本（`Sum(s)`/`Distinct(s)`）一直可用。
 
 **Q：性能如何？**
 A：深链 = 嵌套 `yield` 闭包调用，热点内循环可能不及手写 loop。本库的卖点是可读性和组合性，不是极致性能。API.md 会给出适用边界提示。

@@ -7,11 +7,9 @@
 `seq` 是一个 Go 泛型库，封装标准库的惰性迭代器 `iter.Seq` / `iter.Seq2`（Go 1.23+），为它们提供 Scala 风格、从左到右、可链式调用的集合操作：
 
 ```go
-sum := seq.SumBy(
-    seq.From([]int{1, 2, 3, 4, 5, 6}).
-        Filter(func(x int) bool { return x%2 == 0 }).
-        Map(func(x int) int { return x * x }),
-)
+sum := seq.From([]int{1, 2, 3, 4, 5, 6}).
+    Filter(func(x int) bool { return x%2 == 0 }).
+    SumBy(func(x int) int { return x * x })
 ```
 
 > ⚠️ **本库需要 Go 1.27。** 链式方法依赖泛型方法提案（[golang/go#77273](https://github.com/golang/go/issues/77273)），该提案**已被接受**并在 Go 1.27 中实现。构建需安装 1.27 工具链（当前为 `go1.27rc1`）。详见下方 [状态](#状态)。
@@ -86,6 +84,7 @@ type Seq2[K, V any]  iter.Seq2[K, V]
 | 中间转换（惰性） | 方法 | `Map`、`Filter`、`FlatMap`、`FilterMap`、`Reject`、`Take`/`Drop`、`TakeWhile`/`DropWhile`、`Scan`、`Chunk`、`Window`、`DistinctBy`、`Enumerate` |
 | 终结 | 方法 | `Collect`、`Fold`、`Reduce`、`Find`、`Any`/`All`/`None`、`GroupBy`、`KeyBy`、`Partition`、`SumBy`、`MaxByKey`、`Join` |
 | 约束型 | 自由函数 | `Distinct`、`Contains`、`Max`/`Min`、`Sum`/`Product`/`Mean`、`Sort`、`Union`/`Intersect`/`Difference`、`Compact`、`Without` |
+| 约束型子类型 | 函数（入口）+ 方法 | `Comparable`/`Ordered`/`Numbers` 进入；之后链式 `.Distinct()`、`.Max()`、`.Sum()`；用 `.Ordered()`/`.Comparable()` 降级 |
 | 多序列 | 自由函数 | `Zip`/`Zip3`/`Zip4`、`ZipWith`、`ZipMap`、`Unzip`、`Flatten`、`Concat`、`Interleave` |
 | `Seq2[K,V]` | 方法 + 函数 | `MapValues`、`MapKeys`、`Keys`、`Values`；`ToMap`、`CollectPairs`、`Associate` |
 
