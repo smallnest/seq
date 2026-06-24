@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implementation Notes — Issue #9</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #FAF9F6; color: #1a1a1a; padding: 2.5rem 2rem; line-height: 1.7; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .meta { color: #8B8680; font-size: 0.8125rem; margin-bottom: 2rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; padding-bottom: 0.375rem; border-bottom: 1px solid #E8E4DE; display: flex; align-items: center; gap: 0.5rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.design { background: #5B8A72; }
+    .dot.deviation { background: #D97757; }
+    .dot.tradeoff { background: #4A6FA5; }
+    .dot.question { background: #D4A843; }
+    .item { background: #FFFFFF; border: 1px solid #E8E4DE; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .item h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; }
+    .item p { font-size: 0.8125rem; color: #4A4540; margin-bottom: 0.375rem; }
+    .label { display: inline-block; font-size: 0.6875rem; font-weight: 500; padding: 0.125rem 0.5rem; border-radius: 4px; margin-right: 0.375rem; }
+    .label-design { background: #F5F8F6; color: #5B8A72; border: 1px solid #5B8A72; }
+    .label-deviation { background: #FFF5F0; color: #D97757; border: 1px solid #D97757; }
+    .label-tradeoff { background: #F0F4F8; color: #4A6FA5; border: 1px solid #4A6FA5; }
+    .label-question { background: #FDF8F0; color: #D4A843; border: 1px solid #D4A843; }
+    .none { color: #B0AAA4; font-style: italic; font-size: 0.8125rem; }
+    .footer { text-align: center; margin-top: 2.5rem; color: #B0AAA4; font-size: 0.6875rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Implementation Notes</h1>
+    <p class="meta">Issue <a href="https://github.com/smallnest/seq/issues/9">#9</a> &mdash; 生成权威 API.md 文档 &mdash; 2026-06-24</p>
+
+    <h2><span class="dot design"></span> Design Decisions</h2>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Generated signatures by extracting them from the shipped code, not by transcribing the PRD</h3>
+      <p><strong>Ambiguity:</strong> FR-9 requires "文档与代码签名一致（可人工核对）" — the PRD itself lists intended signatures, but the shipped code diverged in places (e.g. Chunk/Window return <code>iter.Seq[Seq[T]]</code>, <code>SortBy</code> wraps a bool→int adapter).</p>
+      <p><strong>Choice:</strong> Used <code>grep</code> over the merged .go files to enumerate every free function and method (by receiver type), then authored API.md from that ground truth. Spot-checked key signatures (Map, DistinctBy, Chunk, Fold, Numbers) for verbatim parity code↔doc.</p>
+      <p><strong>Rationale:</strong> The PRD is the design intent; the code is the contract. A doc derived from the PRD would silently replicate the PRD's pre-deviation signatures and contradict the shipped API. Deriving from code guarantees the "一致" acceptance criterion holds and makes the deviation (Chunk/Window) surface explicitly rather than being papered over.</p>
+    </div>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Documented the Chunk/Window deviation and the gofmt rc1 false-positive inline in API.md</h3>
+      <p><strong>Ambiguity:</strong> FR-9 wants a clean authoritative contract; it doesn't say whether to surface toolchain limitations.</p>
+      <p><strong>Choice:</strong> API.md §1.3 calls out the <code>iter.Seq[Seq[T]]</code> return-type deviation with the wrap workaround; §6 documents the go1.27rc1 gofmt parser false-positive on generic methods.</p>
+      <p><strong>Rationale:</strong> An authoritative contract that hides the one real deviation would mislead anyone implementing against it. Surfacing both — with the exact workaround (<code>Seq[Seq[T]](s.Chunk(n))</code>) and a "revisit on stable 1.27" note — makes the doc honest and actionable. These are the two facts a downstream reader most needs.</p>
+    </div>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Methods tagged intermediate/terminal; free functions tagged with their "can't be a method" reason category</h3>
+      <p><strong>Ambiguity:</strong> FR-9 asks for both tags but doesn't prescribe a layout.</p>
+      <p><strong>Choice:</strong> Seq[T] methods split into 1.1 (lazy intermediate), 1.2 (materializing intermediate), 1.3 (the Chunk/Window deviation), 1.4 (terminal). Free-function sections (3.2 constrained, 3.3 multi-seq) carry a "为何不是方法" column with the reason class (约束 T / 多类型参数 / 嵌套实例化).</p>
+      <p><strong>Rationale:</strong> The intermediate/terminal split directly serves the "标注中间或终结" criterion and mirrors how a user reasons about laziness. The reason-class column makes the 划分铁律 mechanically auditable from the doc alone — exactly the PRD's Success Metric ("每个自由函数都能对应到三类判定理由之一").</p>
+    </div>
+
+    <h2><span class="dot deviation"></span> Deviations</h2>
+    <p class="none">None from FR-9's own spec. API.md is generated exactly as required: method/free-function partition, one-line semantics, intermediate/terminal tags, free-function reason classes, a dedicated subtype section explaining "入口为函数、降级为方法", and signature parity with code. The deviations <em>documented inside</em> API.md (Chunk/Window return type, gofmt rc1 note) are inherited from issues #6/#10 and are reported there — API.md merely records them faithfully rather than deviating from FR-9.</p>
+
+    <h2><span class="dot tradeoff"></span> Tradeoffs</h2>
+
+    <div class="item">
+      <h3><span class="label label-tradeoff">Tradeoff</span> Hand-authored Markdown tables vs generated from doc comments</h3>
+      <p><strong>Alternatives:</strong> (A) hand-write API.md from the grep'd signatures; (B) generate it from Go doc comments via a tool (e.g. a custom <code>go doc</code> scrape or godoc-to-markdown).</p>
+      <p><strong>Pros/cons:</strong> (A) is full control over layout, tagging, and the reason-class/narrative columns the PRD wants, but must be manually kept in sync; (B) stays auto-in-sync with code but can't easily express the "why not a method" rationale or the intermediate/terminal/materializing taxonomy (those aren't in the code).</p>
+      <p><strong>Why chosen:</strong> (A). The PRD's value-add over raw godoc is precisely the reason-class and intermediate/terminal annotations, which don't exist in code. Hand-authoring with a grep-derived signature base gives both accuracy and the richer taxonomy. Added a §6 note that the doc must be refreshed when signatures change; a future polish pass could add a parity test that greps code signatures and fails the build if API.md drifts.</p>
+    </div>
+
+    <h2><span class="dot question"></span> Open Questions</h2>
+
+    <div class="item">
+      <h3><span class="label label-question">Question</span> Should there be an automated parity test guarding API.md against code drift?</h3>
+      <p><strong>Assumption:</strong> No automated guard yet — parity was verified manually this round (signature grep + spot-check).</p>
+      <p><strong>Verify:</strong> A <code>TestAPIMDParity</code> that greps each public signature from code and asserts it appears in API.md would prevent silent drift on future API changes. Worth adding if the API is expected to evolve; overkill if v1 is frozen. Recommend adding before any post-v1 API expansion.</p>
+    </div>
+
+    <div class="item">
+      <h3><span class="label label-question">Question</span> When Go 1.27 stable lands, must API.md §1.3 and §6 be updated?</h3>
+      <p><strong>Assumption:</strong> Yes — if stable 1.27 lifts the instantiation-cycle limit, Chunk/Window revert to <code>Seq[Seq[T]]</code> and §1.3's deviation note + §6's gofmt note become stale.</p>
+      <p><strong>Verify:</strong> On 1.27 stable release, re-test Chunk/Window signatures and gofmt; update API.md §1.3/§6 accordingly. Tracked in issues #6/#10 notes as well.</p>
+    </div>
+
+    <p class="footer">Generated by goal-workflow /note-it</p>
+  </div>
+</body>
+</html>
