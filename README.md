@@ -1,5 +1,10 @@
 # seq
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/smallnest/seq.svg)](https://pkg.go.dev/github.com/smallnest/seq)
+[![CI](https://github.com/smallnest/seq/actions/workflows/ci.yml/badge.svg)](https://github.com/smallnest/seq/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/badge/Go-%3E%3D1.27-blue)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 English | [简体中文](README_CN.md)
 
 **Chainable, lazy collection pipelines for Go, built on `iter.Seq`.**
