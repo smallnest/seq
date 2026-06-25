@@ -24,9 +24,10 @@ func ExampleSeq_Map() {
 	// Output: [1 2 3]
 }
 
-// ExampleRange builds a sequence of integers and reduces it to their sum.
+// ExampleRange builds a sequence of integers and reduces it to their sum,
+// using the named [Add] operator instead of a closure.
 func ExampleRange() {
-	total, _ := Range(1, 5).Reduce(func(a, b int) int { return a + b })
+	total, _ := Range(1, 5).Reduce(Add)
 	fmt.Println(total)
 	// Output: 10
 }
@@ -58,4 +59,27 @@ func ExampleZip() {
 	dot := Zip(a, b).Fold(0, func(acc int, x, y int) int { return acc + x*y })
 	fmt.Println(dot)
 	// Output: 140
+}
+
+// ExampleAdd uses the named Add operator as a Reduce reducer, avoiding a
+// func(a, b int) int { return a + b } closure.
+func ExampleAdd() {
+	sum, _ := From([]int{1, 2, 3, 4}).Reduce(Add)
+	fmt.Println(sum)
+	// Output: 10
+}
+
+// ExampleGt uses a predicate builder to keep elements greater than a bound,
+// avoiding a func(x int) bool { return x > 2 } closure.
+func ExampleGt() {
+	out := From([]int{1, 2, 3, 4, 5}).Filter(Gt(2)).Collect()
+	fmt.Println(out)
+	// Output: [3 4 5]
+}
+
+// ExampleNot negates a predicate; Reject(Eq(0)) drops zero values.
+func ExampleNot() {
+	out := From([]int{0, 1, 0, 2, 0, 3}).Filter(Not(Eq(0))).Collect()
+	fmt.Println(out)
+	// Output: [1 2 3]
 }
