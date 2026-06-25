@@ -135,6 +135,21 @@ func Iterate[T any](init T, f func(T) T) Seq[T] {
 	})
 }
 
+// Times creates a Seq that yields f(0), f(1), ..., f(n-1). n <= 0 yields
+// nothing (and f is not called), matching [Repeat]'s "empty input, empty
+// output" contract. f is invoked lazily as iteration is driven, not at
+// construction time. It is the finite, index-derived counterpart to the
+// infinite [Generate], [Repeat] and [Iterate] constructors.
+func Times[T any](n int, f func(int) T) Seq[T] {
+	return Seq[T](func(yield func(T) bool) {
+		for i := 0; i < n; i++ {
+			if !yield(f(i)) {
+				return
+			}
+		}
+	})
+}
+
 // FromChannel creates a Seq that drains a receive-only channel. It is a
 // one-shot source: after the channel is closed/drained, iterating again yields
 // nothing.

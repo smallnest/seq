@@ -43,6 +43,40 @@ func (s Seq[T]) GroupBy[K comparable](key func(T) K) map[K][]T {
 	return out
 }
 
+// PartitionBy splits s into groups keyed by `key`, yielding (key, group) pairs
+// in the order each key first appears — unlike [Seq.GroupBy], whose map is
+// unordered. Within a group, elements keep their relative order from s.
+//
+// Although the result is a [Seq2] (a lazy type), PartitionBy is internally
+// materializing: it must consume all of s before yielding any group, because a
+// group is not known to be complete until the source is exhausted. Do not call
+// it on an unbounded sequence. K is comparable, so by the library's 划分铁律
+// this is a free function with a method-level-style type parameter rather than
+// a method on Seq[T].
+func PartitionBy[T any, K comparable](s Seq[T], key func(T) K) Seq2[K, []T] {
+	return Seq2[K, []T](func(yield func(K, []T) bool) {
+		index := make(map[K]int)
+		var order []K
+		var groups [][]T
+		for v := range iter.Seq[T](s) {
+			k := key(v)
+			i, ok := index[k]
+			if !ok {
+				i = len(groups)
+				index[k] = i
+				order = append(order, k)
+				groups = append(groups, nil)
+			}
+			groups[i] = append(groups[i], v)
+		}
+		for i, k := range order {
+			if !yield(k, groups[i]) {
+				return
+			}
+		}
+	})
+}
+
 // KeyBy indexes elements by key extracted by `key`, returning map[K]T. On
 // duplicate keys the later element overwrites (lodash keyBy). K is the
 // method's own constrained type parameter.
