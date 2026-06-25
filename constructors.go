@@ -57,10 +57,13 @@ func Range(start, end int) Seq[int] {
 	})
 }
 
-// RangeStep creates a Seq of the integers in [start, end) advancing by step.
-// A non-positive step yields an empty Seq (the operation is undefined for
-// step <= 0; rather than panic we produce nothing, matching the "empty input,
-// empty output" convention).
+// RangeStep creates a Seq of integers from start toward end, advancing by
+// step. When start < end it ascends over [start, end), yielding start,
+// start+step, ...; when start > end it descends over (end, start], yielding
+// start, start-step, .... In both directions end is exclusive. A non-positive
+// step yields an empty Seq (the operation is undefined for step <= 0; rather
+// than panic we produce nothing, matching the "empty input, empty output"
+// convention).
 func RangeStep(start, end, step int) Seq[int] {
 	return Seq[int](func(yield func(int) bool) {
 		if step <= 0 {

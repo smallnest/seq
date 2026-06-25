@@ -15,6 +15,14 @@
 // methods on Seq[T]; they are provided as free functions (see [Distinct],
 // [Max], [Sum]) or recovered as methods on the constrained subtypes
 // [SeqComparable], [SeqOrdered] and [SeqNumeric].
+//
+// # Function arguments
+//
+// Every higher-order operation (Map, Filter, FlatMap, Reduce, ForEach, and the
+// rest) requires a non-nil function argument. Because operations are lazy, a
+// nil function passed to an intermediate operation panics not at the call site
+// but when a terminal operation later drives iteration; a nil function passed
+// to a terminal operation panics immediately. Callers must not pass nil.
 package seq
 
 import (
