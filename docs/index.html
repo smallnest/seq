@@ -62,10 +62,14 @@ section{margin-bottom:52px;scroll-margin-top:20px}
 .sec-desc{color:var(--ink-soft);font-size:14.5px;margin-bottom:22px;max-width:720px}
 /* Func card */
 .fn{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+.fn-note{background:var(--accent-soft);border-color:#eccdbf;border-left:3px solid var(--accent)}
+.fn-note .fn-sig{color:var(--kw)}
+.fn-note .fn-desc{color:var(--ink)}
 .fn-sig{font-size:14px;color:var(--kw);font-weight:600;margin-bottom:7px;word-break:break-word}
 .fn-desc{font-size:14px;color:var(--ink-soft);margin-bottom:12px}
 pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--code-ink)}
 pre .kw{color:var(--kw)}pre .str{color:var(--str)}pre .com{color:var(--com)}pre .num{color:var(--num)}pre .out{color:var(--accent)}
+pre .ex-link{color:var(--accent);text-decoration:underline}
 .foot{color:var(--ink-soft);font-size:13px;border-top:1px solid var(--line);padding-top:24px;margin-top:40px}
 .foot a{color:var(--accent)}
 @media(max-width:880px){.sidebar{display:none}.main{padding:28px 20px 80px}.hero h2{font-size:27px}}
@@ -202,7 +206,8 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"Mean[T Numeric](s Seq[T]) float64","desc":"算术均值。","ex":"seq.Mean(seq.Of(1,2,3,4)) // 2.5"},
  {"sig":"Sort[T cmp.Ordered](s Seq[T]) Seq[T]","desc":"自然序排序（需物化）。","ex":"seq.Sort(seq.Of(3,1,2)).Collect() // [1 2 3]"}
 ]},
-{"id":"subtype","title":"约束型子类型 · 总览","cnt":"3 个入口函数","desc":"将受约束的自由函数\"恢复\"为方法链。Comparable/Ordered/Numbers 三个入口把裸 Seq[T] 升级为对应子类型，之后即可链式调用受约束的方法。三者形成层级：Numeric ⊂ Ordered ⊂ Comparable，可用 .Ordered()/.Comparable() 逐级降级。注意：在子类型上调用 .Map() 等改变类型的操作会降级回裸 Seq[T]（因为 T 可能不再满足约束）。","fns":[
+{"id":"subtype","title":"约束型子类型 · 总览","cnt":"3 个入口函数","desc":"为什么需要三个子类型？因为 Seq[T] 在类型层把 T 声明为 any（以保零成本互转标准库），而 Distinct/Max/Sum 这些操作要求 T 满足更窄的约束（comparable / cmp.Ordered / Numeric）。Go 目前不允许某个方法给接收者的类型参数追加更窄的约束——你无法写 \"func (s Seq[T]) Max() 仅当 T 是 cmp.Ordered\"。折中方案：定义三个约束更窄的 defined type——SeqComparable/SeqOrdered/SeqNumeric——把受约束的操作\"恢复\"成可链式方法。Comparable/Ordered/Numbers 三个入口把裸 Seq[T] 升级为对应子类型；三者形成层级 Numeric ⊂ Ordered ⊂ Comparable，可用 .Ordered()/.Comparable() 逐级降级。注意：在子类型上调用 .Map() 等改变类型的操作会降级回裸 Seq[T]（因为新 T 可能不再满足约束）。【相关提案见下方说明】","fns":[
+ {"sig":"⚑ 语言提案 golang/go#65394（未被接受、未实现）","desc":"该提案标题为 “proposal: spec: allow methods on generic structs which meet subset of type constraint”，提议允许泛型类型的「某个方法」给其类型参数追加一个更窄的子集约束——例如让 Seq[T] 上的 Max() 仅在 T 满足 cmp.Ordered 时可用。倘若它被接受并实现，本库就无需 SeqComparable/SeqOrdered/SeqNumeric 这三个子类型，可直接在单个 Seq[T] 上按约束暴露方法。截至目前该提案仍处于 Open（Proposal 里程碑，带 LanguageChange/LanguageChangeReview 标签），尚未被接受，也尚未实现——故本库以三个约束子类型作为当前可行的替代方案。注意它与本库用到的「方法级类型参数」(golang/go#77273) 是两回事：#77273 是给方法引入新的类型参数（如 Map[U]），#65394 是给已有类型参数收窄约束。","ex":"// 提案地址：https://github.com/golang/go/issues/65394\n// 现状：Open，未接受、未实现\n// 若被接受，理想写法可能是：\n//   func (s Seq[T]) Max() Optional[T]  where T: cmp.Ordered\n// 在那之前，用约束子类型：\nseq.Ordered(seq.Of(3,1,2)).Max().OrZero() // 3"},
  {"sig":"Comparable[T comparable](s Seq[T]) SeqComparable[T]","desc":"【入口】升级为 comparable 子类型，解锁去重/查找/集合运算/替换等需要 == 的方法。","ex":"seq.Comparable(seq.Of(1,1,2)).Distinct().Collect() // [1 2]"},
  {"sig":"Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]","desc":"【入口】升级为 ordered 子类型，在 comparable 基础上再解锁 Max/Min/Sort。","ex":"seq.Ordered(seq.Of(3,1,2)).Sort().Collect() // [1 2 3]"},
  {"sig":"Numbers[T Numeric](s Seq[T]) SeqNumeric[T]","desc":"【入口】升级为 numeric 子类型，在 ordered 基础上再解锁 Sum/Product/Mean。","ex":"seq.Numbers(seq.Of(1,2,3)).Sum() // 6"}
@@ -303,6 +308,10 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"Gt / Ge / Lt / Le[T cmp.Ordered](v T) func(T) bool","desc":"构造大于/不小于/小于/不大于的谓词。","ex":"seq.Range(0,5).Filter(seq.Gt(2)).Collect() // [3 4]"},
  {"sig":"Not[T any](p func(T) bool) func(T) bool","desc":"谓词取反。","ex":"seq.Range(0,4).Filter(seq.Not(seq.Gt(1))).Collect() // [0 1]"},
  {"sig":"Identity[T any](x T) T","desc":"恒等函数。","ex":"seq.Of(1,2).Map(seq.Identity[int]).Collect() // [1 2]"}
+]},
+{"id":"outlook","title":"展望 · 轻量函数字面量","cnt":"语言提案","desc":"本库是函数式管道，几乎每个操作都吃一个回调（Map/Filter/Reduce/FlatMap…）。Go 当前的匿名函数语法冗长——必须完整写出 func、参数类型、返回类型与 return，这是链式调用时最大的视觉噪音来源。一个语言提案若落地，将大幅简化本库的调用代码。","fns":[
+ {"sig":"⚑ 语言提案 golang/go#21498 · short function literals（Open，未实现）","desc":"该提案标题为 “proposal: spec: short function literals”，提议一种轻量匿名函数语法：参数与返回类型由上下文推断，省去 func/类型标注/return 样板——即 Go 版的 lambda。作者明确表示未锁定具体语法（下例的 |x,y| 仅为示意）。该提案自 2017 年开启，约千条讨论，2024 年中一小群参与者就「可行语法」达成了初步收敛，但截至目前仍为 Open（Proposal 里程碑，LanguageChange/LanguageChangeReview 标签），尚未被接受、尚未实现。","ex":"// 提案地址：https://github.com/golang/go/issues/21498\n// 现状：Open，未接受、未实现"},
+ {"sig":"预测：lambda 落地后，本库调用将大幅简化","desc":"一旦轻量函数字面量进入 Go，本库每一处回调都能去掉 func/类型/return 样板。链式管道会从「被 func(x int) bool { return … } 切碎」变成几乎只剩业务逻辑本身——可读性接近 Rust/Scala 的集合链。下面用示意语法 |x| expr 对比当前与未来写法。","ex":"// —— 现在 ——\nseq.From(xs).\n    Filter(func(n int) bool { return n%2 == 0 }).\n    Map(func(n int) int { return n * n }).\n    Reduce(func(a, b int) int { return a + b }).\n    OrZero()\n\n// —— lambda 落地后（示意）——\nseq.From(xs).\n    Filter(|n| n%2 == 0).\n    Map(|n| n*n).\n    Reduce(|a, b| a+b).\n    OrZero()\n\n// 连带地，funcs.go 里 Add/Gt/Eq/Not 这些\n// 为了「省去写闭包」而存在的算子/谓词构造器，\n// 其价值也会下降——因为届时手写 lambda 已足够轻量。"}
 ]}
 ]}
 </script>
@@ -313,14 +322,25 @@ const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;
 // crude Go-ish highlighter for example lines
 function hl(code){
   let h = esc(code);
-  // comments first (everything after // including output)
-  h = h.replace(/(\/\/.*)$/gm, '<span class="com">$1</span>');
+  // comments: wrap each // line
+  h = h.replace(/(\/\/[^\n]*)$/gm, '<span class="com">$1</span>');
   // strings
   h = h.replace(/(&quot;[^&]*?&quot;)/g, '<span class="str">$1</span>');
+  // linkify bare URLs before keyword/number passes mangle them
+  h = h.replace(/(https?:\/\/[^\s<]+)/g, m => ` LINK ${m} /LINK `);
   // keywords
-  h = h.replace(/\b(func|return|int|bool|string|float64|range|for|if|struct)\b/g, '<span class="kw">$1</span>');
-  // numbers
-  h = h.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>');
+  h = h.replace(/\b(func|return|int|bool|string|float64|range|for|if|struct|where)\b/g, '<span class="kw">$1</span>');
+  // numbers (skip those inside a protected URL token)
+  h = h.replace(/\b(\d+(?:\.\d+)?)\b/g, (m, d, off, str) => {
+    const before = str.slice(0, off);
+    const open = before.lastIndexOf(' LINK ');
+    const close = before.lastIndexOf(' /LINK ');
+    if (open > close) return m; // inside a URL token, leave alone
+    return `<span class="num">${d}</span>`;
+  });
+  // materialize protected URLs into anchors
+  h = h.replace(/ LINK ([\s\S]*?) \/LINK /g,
+    '<a href="$1" target="_blank" rel="noopener" class="ex-link">$1</a>');
   return h;
 }
 
@@ -340,7 +360,8 @@ data.groups.forEach(g => {
   let html = `<div class="sec-head"><h3>${esc(g.title)}</h3><span class="cnt">${esc(g.cnt)}</span></div>`;
   html += `<p class="sec-desc">${esc(g.desc)}</p>`;
   g.fns.forEach(fn => {
-    html += `<div class="fn">
+    const isNote = fn.sig.startsWith('⚑');
+    html += `<div class="fn${isNote ? ' fn-note' : ''}">
       <div class="fn-sig">${esc(fn.sig)}</div>
       <div class="fn-desc">${esc(fn.desc)}</div>
       <pre>${hl(fn.ex)}</pre>
