@@ -85,11 +85,12 @@ type Seq2[K, V any]  iter.Seq2[K, V]
 
 | 分组 | 形态 | 示例 |
 |------|------|------|
-| 构造入口 | 自由函数 | `From`、`Of`、`Range`、`RangeStep`、`Repeat`、`Generate`、`Iterate`、`FromChannel`、`FromMap` |
+| 构造入口 | 自由函数 | `From`、`Of`、`Range`、`RangeStep`、`Repeat`、`Generate`、`Iterate`、`Times`、`FromChannel`、`FromMap` |
 | 中间转换（惰性） | 方法 | `Map`、`Filter`、`FlatMap`、`FilterMap`、`Reject`、`Take`/`Drop`、`TakeWhile`/`DropWhile`、`Scan`、`Chunk`、`Window`、`DistinctBy`、`Enumerate` |
 | 终结 | 方法 | `Collect`、`Fold`、`Reduce`、`Find`、`Any`/`All`/`None`、`GroupBy`、`KeyBy`、`Partition`、`SumBy`、`MaxByKey`、`Join` |
+| 分组 | 自由函数 | `PartitionBy`（保序分组，产出 `Seq2[K,[]T]`） |
 | 约束型 | 自由函数 | `Distinct`、`Contains`、`Max`/`Min`、`Sum`/`Product`/`Mean`、`Sort`、`Union`/`Intersect`/`Difference`、`Compact`、`Without` |
-| 约束型子类型 | 函数（入口）+ 方法 | `Comparable`/`Ordered`/`Numbers` 进入；之后链式 `.Distinct()`、`.Max()`、`.Sum()`；用 `.Ordered()`/`.Comparable()` 降级 |
+| 约束型子类型 | 函数（入口）+ 方法 | `Comparable`/`Ordered`/`Numbers` 进入；之后链式 `.Distinct()`、`.Max()`、`.Sum()`、`.Replace()`/`.ReplaceAll()`；用 `.Ordered()`/`.Comparable()` 降级 |
 | 多序列 | 自由函数 | `Zip`/`Zip3`/`Zip4`、`ZipWith`、`ZipMap`、`Unzip`、`Flatten`、`Concat`、`Interleave` |
 | `Seq2[K,V]` | 方法 + 函数 | `MapValues`、`MapKeys`、`Keys`、`Values`；`ToMap`、`CollectPairs`、`Associate` |
 | `Optional[T]` | 类型 + 方法 + 函数 | `Some`/`None`/`ToOptional`；`Get`、`Unwrap`/`UnwrapOr`/`OrElse`、`Map`、`Filter`、`FlatMap`；`MapOptional`（可改类型） |

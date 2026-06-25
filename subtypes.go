@@ -160,6 +160,30 @@ func (s SeqComparable[T]) Peek(f func(T)) SeqComparable[T] {
 	return SeqComparable[T](s.Seq().Peek(f))
 }
 
+// Replace lazily replaces the first n elements equal to old with new, passing
+// all other elements through unchanged in order. n < 0 means replace every
+// match (equivalent to [SeqComparable.ReplaceAll]); n == 0 replaces nothing.
+func (s SeqComparable[T]) Replace(old, new T, n int) SeqComparable[T] {
+	return SeqComparable[T](iter.Seq[T](func(yield func(T) bool) {
+		replaced := 0
+		for v := range iter.Seq[T](s) {
+			if v == old && (n < 0 || replaced < n) {
+				v = new
+				replaced++
+			}
+			if !yield(v) {
+				return
+			}
+		}
+	}))
+}
+
+// ReplaceAll lazily replaces every element equal to old with new, passing all
+// other elements through unchanged. It is Replace(old, new, -1).
+func (s SeqComparable[T]) ReplaceAll(old, new T) SeqComparable[T] {
+	return s.Replace(old, new, -1)
+}
+
 // --- SeqOrdered[T] methods (constrained: cmp.Ordered) ---
 
 // Max returns the maximum element, or (zero, false) if empty.

@@ -85,11 +85,12 @@ The rule is mechanically checkable: ask "does it constrain `T` itself?" If yes, 
 
 | Group | Form | Examples |
 |-------|------|----------|
-| Constructors | free functions | `From`, `Of`, `Range`, `RangeStep`, `Repeat`, `Generate`, `Iterate`, `FromChannel`, `FromMap` |
+| Constructors | free functions | `From`, `Of`, `Range`, `RangeStep`, `Repeat`, `Generate`, `Iterate`, `Times`, `FromChannel`, `FromMap` |
 | Intermediate (lazy) | methods | `Map`, `Filter`, `FlatMap`, `FilterMap`, `Reject`, `Take`/`Drop`, `TakeWhile`/`DropWhile`, `Scan`, `Chunk`, `Window`, `DistinctBy`, `Enumerate` |
 | Terminal | methods | `Collect`, `Fold`, `Reduce`, `Find`, `Any`/`All`/`None`, `GroupBy`, `KeyBy`, `Partition`, `SumBy`, `MaxByKey`, `Join` |
+| Grouping | free functions | `PartitionBy` (ordered groups as `Seq2[K,[]T]`) |
 | Constrained | free functions | `Distinct`, `Contains`, `Max`/`Min`, `Sum`/`Product`/`Mean`, `Sort`, `Union`/`Intersect`/`Difference`, `Compact`, `Without` |
-| Constrained subtypes | functions (entry) + methods | `Comparable`/`Ordered`/`Numbers` enter; then chain `.Distinct()`, `.Max()`, `.Sum()`; downgrade with `.Ordered()`/`.Comparable()` |
+| Constrained subtypes | functions (entry) + methods | `Comparable`/`Ordered`/`Numbers` enter; then chain `.Distinct()`, `.Max()`, `.Sum()`, `.Replace()`/`.ReplaceAll()`; downgrade with `.Ordered()`/`.Comparable()` |
 | Multi-sequence | free functions | `Zip`/`Zip3`/`Zip4`, `ZipWith`, `ZipMap`, `Unzip`, `Flatten`, `Concat`, `Interleave` |
 | `Seq2[K,V]` | methods + functions | `MapValues`, `MapKeys`, `Keys`, `Values`; `ToMap`, `CollectPairs`, `Associate` |
 | `Optional[T]` | type + methods + function | `Some`/`None`/`ToOptional`; `Get`, `Unwrap`/`UnwrapOr`/`OrElse`, `Map`, `Filter`, `FlatMap`; `MapOptional` (type-changing) |
