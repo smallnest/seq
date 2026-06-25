@@ -10,25 +10,25 @@ import (
 // tests only exercised transitively.
 
 func TestMaxEdgeCases(t *testing.T) {
-	if _, ok := Max(Empty[int]()); ok {
-		t.Fatalf("Max(empty): ok = true, want false")
+	if Max(Empty[int]()).IsPresent() {
+		t.Fatalf("Max(empty): present, want None")
 	}
-	if v, ok := Max(Of(42)); !ok || v != 42 {
+	if v, ok := Max(Of(42)).Get(); !ok || v != 42 {
 		t.Fatalf("Max(single): got (%d, %v), want (42, true)", v, ok)
 	}
-	if v, ok := Max(Of(7, 7, 7)); !ok || v != 7 {
+	if v, ok := Max(Of(7, 7, 7)).Get(); !ok || v != 7 {
 		t.Fatalf("Max(all-equal): got (%d, %v), want (7, true)", v, ok)
 	}
 }
 
 func TestMinEdgeCases(t *testing.T) {
-	if _, ok := Min(Empty[int]()); ok {
-		t.Fatalf("Min(empty): ok = true, want false")
+	if Min(Empty[int]()).IsPresent() {
+		t.Fatalf("Min(empty): present, want None")
 	}
-	if v, ok := Min(Of(42)); !ok || v != 42 {
+	if v, ok := Min(Of(42)).Get(); !ok || v != 42 {
 		t.Fatalf("Min(single): got (%d, %v), want (42, true)", v, ok)
 	}
-	if v, ok := Min(Of(7, 7, 7)); !ok || v != 7 {
+	if v, ok := Min(Of(7, 7, 7)).Get(); !ok || v != 7 {
 		t.Fatalf("Min(all-equal): got (%d, %v), want (7, true)", v, ok)
 	}
 }

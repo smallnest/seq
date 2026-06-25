@@ -55,11 +55,11 @@ func TestNumbersFloatMean(t *testing.T) {
 
 func TestSeqOrderedMinMaxSort(t *testing.T) {
 	so := Ordered(From([]int{3, 1, 4, 1, 5, 9, 2, 6}))
-	mx, ok := so.Max()
+	mx, ok := so.Max().Get()
 	if !ok || mx != 9 {
 		t.Fatalf("Max: (%d,%v)", mx, ok)
 	}
-	mn, ok := so.Min()
+	mn, ok := so.Min().Get()
 	if !ok || mn != 1 {
 		t.Fatalf("Min: (%d,%v)", mn, ok)
 	}
@@ -80,7 +80,7 @@ func TestSeqComparableContainsIndexOfCountValues(t *testing.T) {
 	if sc.Contains(9) {
 		t.Fatal("Contains 9")
 	}
-	if idx, ok := sc.IndexOf(2); !ok || idx != 1 {
+	if idx, ok := sc.IndexOf(2).Get(); !ok || idx != 1 {
 		t.Fatalf("IndexOf 2: (%d,%v)", idx, ok)
 	}
 	cv := sc.CountValues()

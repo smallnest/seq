@@ -61,7 +61,7 @@ Because `Seq[T any]` pins `T` to `any`, a method's type parameters are fresh and
 
   ```go
   func Distinct[T comparable](s Seq[T]) Seq[T]
-  func Max[T cmp.Ordered](s Seq[T]) (T, bool)
+  func Max[T cmp.Ordered](s Seq[T]) Optional[T]
   func Sum[T Numeric](s Seq[T]) T
   ```
 
@@ -99,13 +99,21 @@ The full, authoritative list with one-line semantics for each entry will live in
 
 ### Optional[T]
 
-`Optional[T]` is a zero-dependency, opt-in wrapper over the `(T, bool)` pair returned by `Find`, `First`, `Last`, `Nth`, `Reduce` and the other partial-result methods. It exists only as caller-side sugar — **no `Seq`/`Seq2` method takes or returns it**, so the package keeps its zero-cost interop with `iter.Seq` and the standard library. Bridge from any `(T, bool)` method with `ToOptional`:
+`Optional[T]` is the zero-dependency type used to express "maybe no result". The partial-result terminals — `Find`, `FindLast`, `First`, `Last`, `Nth`, `Reduce`, `MaxBy`/`MinBy`/`MaxByKey`/`MinByKey`, the package-level `Max`/`Min`, and the index-returning `FindIndex`/`IndexOf`/`LastIndexOf` (as `Optional[int]`) — all **return an `Optional` directly**, so you can chain post-processing without unpacking:
 
 ```go
-out := seq.ToOptional(s.Find(func(x int) bool { return x > 2 })).
+out := s.Find(func(x int) bool { return x > 2 }).
     Map(func(x int) int { return x * 10 }).
     OrElse(-1)
 ```
+
+`Seq2.Find` returns `Optional[Pair[K, V]]` (the key/value wrapped in a `Pair`). To drop back to Go's idiomatic `(value, ok)` pair, call `.Get()`:
+
+```go
+if v, ok := s.Max().Get(); ok { use(v) }
+```
+
+`ToOptional(v, ok)` bridges the other direction — wrapping a legacy `(value, ok)` pair into an `Optional`.
 
 Because Go methods cannot introduce new type parameters, `Optional.Map` is same-type only; use the package-level `MapOptional[T, U]` to change the element type (e.g. `Optional[int]` → `Optional[string]`).
 

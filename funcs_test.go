@@ -46,16 +46,16 @@ func TestOperators(t *testing.T) {
 
 func TestOperatorsThroughReduce(t *testing.T) {
 	// The headline win: pass the named operator, no instantiation, no closure.
-	if sum, ok := From([]int{1, 2, 3, 4}).Reduce(Add); !ok || sum != 10 {
+	if sum, ok := From([]int{1, 2, 3, 4}).Reduce(Add).Get(); !ok || sum != 10 {
 		t.Errorf("Reduce(Add) = (%d, %v), want (10, true)", sum, ok)
 	}
-	if prod, ok := From([]int{1, 2, 3, 4}).Reduce(Mul); !ok || prod != 24 {
+	if prod, ok := From([]int{1, 2, 3, 4}).Reduce(Mul).Get(); !ok || prod != 24 {
 		t.Errorf("Reduce(Mul) = (%d, %v), want (24, true)", prod, ok)
 	}
-	if mx, ok := From([]int{3, 1, 4, 1, 5}).Reduce(Max2); !ok || mx != 5 {
+	if mx, ok := From([]int{3, 1, 4, 1, 5}).Reduce(Max2).Get(); !ok || mx != 5 {
 		t.Errorf("Reduce(Max2) = (%d, %v), want (5, true)", mx, ok)
 	}
-	if mn, ok := From([]int{3, 1, 4, 1, 5}).Reduce(Min2); !ok || mn != 1 {
+	if mn, ok := From([]int{3, 1, 4, 1, 5}).Reduce(Min2).Get(); !ok || mn != 1 {
 		t.Errorf("Reduce(Min2) = (%d, %v), want (1, true)", mn, ok)
 	}
 }

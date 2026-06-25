@@ -88,9 +88,9 @@ func (s Seq[T]) KeyBy[K comparable](key func(T) K) map[K]T {
 	return out
 }
 
-// MaxBy returns the element for which less reports it as greatest, or
-// (zero, false) if empty.
-func (s Seq[T]) MaxBy(less func(a, b T) bool) (T, bool) {
+// MaxBy returns the element for which less reports it as greatest, or None if
+// empty.
+func (s Seq[T]) MaxBy(less func(a, b T) bool) Optional[T] {
 	var best T
 	first := true
 	for v := range iter.Seq[T](s) {
@@ -103,12 +103,15 @@ func (s Seq[T]) MaxBy(less func(a, b T) bool) (T, bool) {
 			best = v
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
-// MinBy returns the element for which less reports it as least, or
-// (zero, false) if empty.
-func (s Seq[T]) MinBy(less func(a, b T) bool) (T, bool) {
+// MinBy returns the element for which less reports it as least, or None if
+// empty.
+func (s Seq[T]) MinBy(less func(a, b T) bool) Optional[T] {
 	var best T
 	first := true
 	for v := range iter.Seq[T](s) {
@@ -121,13 +124,16 @@ func (s Seq[T]) MinBy(less func(a, b T) bool) (T, bool) {
 			best = v
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
 // MaxByKey returns the element whose projected key is greatest (lodash maxBy).
-// K is the method's own constrained type parameter (cmp.Ordered). Returns
-// (zero, false) if empty.
-func (s Seq[T]) MaxByKey[K cmp.Ordered](key func(T) K) (T, bool) {
+// K is the method's own constrained type parameter (cmp.Ordered). Returns None
+// if empty.
+func (s Seq[T]) MaxByKey[K cmp.Ordered](key func(T) K) Optional[T] {
 	var best T
 	var bestKey K
 	first := true
@@ -142,13 +148,16 @@ func (s Seq[T]) MaxByKey[K cmp.Ordered](key func(T) K) (T, bool) {
 			best, bestKey = v, k
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
 // MinByKey returns the element whose projected key is least (lodash minBy).
-// K is the method's own constrained type parameter (cmp.Ordered). Returns
-// (zero, false) if empty.
-func (s Seq[T]) MinByKey[K cmp.Ordered](key func(T) K) (T, bool) {
+// K is the method's own constrained type parameter (cmp.Ordered). Returns None
+// if empty.
+func (s Seq[T]) MinByKey[K cmp.Ordered](key func(T) K) Optional[T] {
 	var best T
 	var bestKey K
 	first := true
@@ -163,7 +172,10 @@ func (s Seq[T]) MinByKey[K cmp.Ordered](key func(T) K) (T, bool) {
 			best, bestKey = v, k
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
 // SumBy sums the projected numeric value of each element (lodash sumBy). U is

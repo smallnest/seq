@@ -205,9 +205,21 @@ func TestMapOptional(t *testing.T) {
 }
 
 func ExampleToOptional() {
+	// ToOptional bridges a legacy (value, ok) pair into an Optional. Here we
+	// synthesize one; most Seq terminals (Find, First, Max, ...) already return
+	// an Optional directly and need no bridge.
+	v, ok := 42, true
+	out := ToOptional(v, ok).
+		Map(func(x int) int { return x * 10 }).
+		OrElse(-1)
+	fmt.Println(out)
+	// Output: 420
+}
+
+func ExampleSeq_Find() {
 	s := From([]int{1, 2, 3, 4})
-	// Bridge a (T, bool) result into an Optional and chain post-processing.
-	out := ToOptional(s.Find(func(x int) bool { return x > 2 })).
+	// Find returns an Optional directly — chain post-processing with no bridge.
+	out := s.Find(func(x int) bool { return x > 2 }).
 		Map(func(x int) int { return x * 10 }).
 		OrElse(-1)
 	fmt.Println(out)

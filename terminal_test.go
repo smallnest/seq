@@ -49,14 +49,14 @@ func TestFold(t *testing.T) {
 }
 
 func TestReduce(t *testing.T) {
-	r, ok := From([]int{1, 2, 3, 4}).Reduce(func(a, b int) int { return a + b })
+	r, ok := From([]int{1, 2, 3, 4}).Reduce(func(a, b int) int { return a + b }).Get()
 	if !ok || r != 10 {
 		t.Fatalf("Reduce: (%d,%v)", r, ok)
 	}
-	if _, ok := From([]int{}).Reduce(func(a, b int) int { return a + b }); ok {
-		t.Fatal("Reduce empty should be (zero,false)")
+	if From([]int{}).Reduce(func(a, b int) int { return a + b }).IsPresent() {
+		t.Fatal("Reduce empty should be None")
 	}
-	if r, ok := From([]int{42}).Reduce(func(a, b int) int { return a + b }); !ok || r != 42 {
+	if r, ok := From([]int{42}).Reduce(func(a, b int) int { return a + b }).Get(); !ok || r != 42 {
 		t.Fatalf("Reduce single: (%d,%v)", r, ok)
 	}
 }
@@ -114,26 +114,26 @@ func TestKeyBy(t *testing.T) {
 }
 
 func TestFindFamily(t *testing.T) {
-	v, ok := From([]int{1, 2, 3, 4}).Find(func(x int) bool { return x > 2 })
+	v, ok := From([]int{1, 2, 3, 4}).Find(func(x int) bool { return x > 2 }).Get()
 	if !ok || v != 3 {
 		t.Fatalf("Find: (%d,%v)", v, ok)
 	}
-	if _, ok := From([]int{1, 2}).Find(func(x int) bool { return x > 9 }); ok {
+	if From([]int{1, 2}).Find(func(x int) bool { return x > 9 }).IsPresent() {
 		t.Fatal("Find absent")
 	}
-	idx, ok := From([]int{1, 2, 3, 4}).FindIndex(func(x int) bool { return x > 2 })
+	idx, ok := From([]int{1, 2, 3, 4}).FindIndex(func(x int) bool { return x > 2 }).Get()
 	if !ok || idx != 2 {
 		t.Fatalf("FindIndex: (%d,%v)", idx, ok)
 	}
 	// FindLast: last even
-	lv, ok := From([]int{1, 2, 3, 4, 5, 6}).FindLast(func(x int) bool { return x%2 == 0 })
+	lv, ok := From([]int{1, 2, 3, 4, 5, 6}).FindLast(func(x int) bool { return x%2 == 0 }).Get()
 	if !ok || lv != 6 {
 		t.Fatalf("FindLast: (%d,%v)", lv, ok)
 	}
-	if _, ok := From([]int{1, 3, 5}).FindLast(func(x int) bool { return x%2 == 0 }); ok {
+	if From([]int{1, 3, 5}).FindLast(func(x int) bool { return x%2 == 0 }).IsPresent() {
 		t.Fatal("FindLast absent")
 	}
-	li, ok := From([]int{1, 2, 3, 2}).FindLastIndex(func(x int) bool { return x == 2 })
+	li, ok := From([]int{1, 2, 3, 2}).FindLastIndex(func(x int) bool { return x == 2 }).Get()
 	if !ok || li != 3 {
 		t.Fatalf("FindLastIndex: (%d,%v)", li, ok)
 	}
@@ -161,28 +161,28 @@ func TestAnyAllNone(t *testing.T) {
 }
 
 func TestFirstLastNth(t *testing.T) {
-	v, ok := From([]int{1, 2, 3}).First()
+	v, ok := From([]int{1, 2, 3}).First().Get()
 	if !ok || v != 1 {
 		t.Fatalf("First: (%d,%v)", v, ok)
 	}
-	if _, ok := From([]int{}).First(); ok {
+	if From([]int{}).First().IsPresent() {
 		t.Fatal("First empty")
 	}
-	v, ok = From([]int{1, 2, 3}).Last()
+	v, ok = From([]int{1, 2, 3}).Last().Get()
 	if !ok || v != 3 {
 		t.Fatalf("Last: (%d,%v)", v, ok)
 	}
-	if _, ok := From([]int{}).Last(); ok {
+	if From([]int{}).Last().IsPresent() {
 		t.Fatal("Last empty")
 	}
-	v, ok = From([]int{10, 20, 30}).Nth(1)
+	v, ok = From([]int{10, 20, 30}).Nth(1).Get()
 	if !ok || v != 20 {
 		t.Fatalf("Nth: (%d,%v)", v, ok)
 	}
-	if _, ok := From([]int{1, 2}).Nth(5); ok {
+	if From([]int{1, 2}).Nth(5).IsPresent() {
 		t.Fatal("Nth out of range")
 	}
-	if _, ok := From([]int{1, 2}).Nth(-1); ok {
+	if From([]int{1, 2}).Nth(-1).IsPresent() {
 		t.Fatal("Nth negative")
 	}
 }
@@ -213,15 +213,15 @@ func TestPartitionSpan(t *testing.T) {
 }
 
 func TestMaxByMinBy(t *testing.T) {
-	mx, ok := From([]string{"apple", "banana", "cherry"}).MaxBy(func(a, b string) bool { return a < b })
+	mx, ok := From([]string{"apple", "banana", "cherry"}).MaxBy(func(a, b string) bool { return a < b }).Get()
 	if !ok || mx != "cherry" {
 		t.Fatalf("MaxBy: (%q,%v)", mx, ok)
 	}
-	mn, ok := From([]string{"apple", "banana", "cherry"}).MinBy(func(a, b string) bool { return a < b })
+	mn, ok := From([]string{"apple", "banana", "cherry"}).MinBy(func(a, b string) bool { return a < b }).Get()
 	if !ok || mn != "apple" {
 		t.Fatalf("MinBy: (%q,%v)", mn, ok)
 	}
-	if _, ok := From([]string{}).MaxBy(func(a, b string) bool { return a < b }); ok {
+	if From([]string{}).MaxBy(func(a, b string) bool { return a < b }).IsPresent() {
 		t.Fatal("MaxBy empty")
 	}
 }
@@ -235,13 +235,13 @@ func TestMaxByKeyMinByKey(t *testing.T) {
 	people := From([]person{
 		{"a", 30}, {"b", 25}, {"c", 35},
 	})
-	oldest, ok := people.MaxByKey(func(p person) int { return p.age })
+	oldest, ok := people.MaxByKey(func(p person) int { return p.age }).Get()
 	if !ok || oldest.age != 35 || oldest.name != "c" {
 		t.Fatalf("MaxByKey: %+v", oldest)
 	}
 	// reuse a fresh source (Seq is lazy, re-iterable if slice-backed)
 	people2 := From([]person{{"a", 30}, {"b", 25}, {"c", 35}})
-	youngest, ok := people2.MinByKey(func(p person) int { return p.age })
+	youngest, ok := people2.MinByKey(func(p person) int { return p.age }).Get()
 	if !ok || youngest.age != 25 || youngest.name != "b" {
 		t.Fatalf("MinByKey: %+v", youngest)
 	}

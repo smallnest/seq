@@ -81,8 +81,8 @@ func (s SeqComparable[T]) Contains(v T) bool {
 	return Contains(s.Seq(), v)
 }
 
-// IndexOf returns the first index of v, or (0, false) if absent.
-func (s SeqComparable[T]) IndexOf(v T) (int, bool) {
+// IndexOf returns the first index of v, or None if absent.
+func (s SeqComparable[T]) IndexOf(v T) Optional[int] {
 	return IndexOf(s.Seq(), v)
 }
 
@@ -186,13 +186,13 @@ func (s SeqComparable[T]) ReplaceAll(old, new T) SeqComparable[T] {
 
 // --- SeqOrdered[T] methods (constrained: cmp.Ordered) ---
 
-// Max returns the maximum element, or (zero, false) if empty.
-func (s SeqOrdered[T]) Max() (T, bool) {
+// Max returns the maximum element, or None if empty.
+func (s SeqOrdered[T]) Max() Optional[T] {
 	return Max(s.Comparable().Seq())
 }
 
-// Min returns the minimum element, or (zero, false) if empty.
-func (s SeqOrdered[T]) Min() (T, bool) {
+// Min returns the minimum element, or None if empty.
+func (s SeqOrdered[T]) Min() Optional[T] {
 	return Min(s.Comparable().Seq())
 }
 
@@ -212,7 +212,7 @@ func (s SeqOrdered[T]) Contains(v T) bool {
 }
 
 // IndexOf returns the first index of v (inherited from comparable).
-func (s SeqOrdered[T]) IndexOf(v T) (int, bool) {
+func (s SeqOrdered[T]) IndexOf(v T) Optional[int] {
 	return IndexOf(s.Comparable().Seq(), v)
 }
 
@@ -258,13 +258,13 @@ func (s SeqNumeric[T]) Sum() T {
 	return Sum(s.Ordered().Comparable().Seq())
 }
 
-// Max returns the maximum element (inherited from ordered), or (zero,false).
-func (s SeqNumeric[T]) Max() (T, bool) {
+// Max returns the maximum element (inherited from ordered), or None.
+func (s SeqNumeric[T]) Max() Optional[T] {
 	return Max(s.Ordered().Comparable().Seq())
 }
 
-// Min returns the minimum element (inherited from ordered), or (zero,false).
-func (s SeqNumeric[T]) Min() (T, bool) {
+// Min returns the minimum element (inherited from ordered), or None.
+func (s SeqNumeric[T]) Min() Optional[T] {
 	return Min(s.Ordered().Comparable().Seq())
 }
 
@@ -285,7 +285,7 @@ func (s SeqNumeric[T]) Contains(v T) bool {
 }
 
 // IndexOf returns the first index of v (inherited from comparable).
-func (s SeqNumeric[T]) IndexOf(v T) (int, bool) {
+func (s SeqNumeric[T]) IndexOf(v T) Optional[int] {
 	return IndexOf(s.Ordered().Comparable().Seq(), v)
 }
 

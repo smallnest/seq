@@ -101,11 +101,11 @@ func TestCount2(t *testing.T) {
 
 func TestFind2(t *testing.T) {
 	src := seq2FromPairs([]Pair[string, int]{{"a", 1}, {"b", 2}, {"c", 3}})
-	k, v, ok := src.Find(func(k string, v int) bool { return v == 2 })
-	if !ok || k != "b" || v != 2 {
-		t.Fatalf("Find2: (%q,%d,%v)", k, v, ok)
+	p, ok := src.Find(func(k string, v int) bool { return v == 2 }).Get()
+	if !ok || p.Left != "b" || p.Right != 2 {
+		t.Fatalf("Find2: (%+v,%v)", p, ok)
 	}
-	if _, _, ok := src.Find(func(k string, v int) bool { return v == 99 }); ok {
+	if src.Find(func(k string, v int) bool { return v == 99 }).IsPresent() {
 		t.Fatal("Find2 absent")
 	}
 }

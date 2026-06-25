@@ -109,17 +109,15 @@ func (s Seq2[K, V]) Count() int {
 	return n
 }
 
-// Find returns the first (key, value) pair satisfying pred, or (zero, zero,
-// false) if none match.
-func (s Seq2[K, V]) Find(pred func(K, V) bool) (K, V, bool) {
+// Find returns the first (key, value) pair satisfying pred wrapped in a
+// [Pair], or None if none match.
+func (s Seq2[K, V]) Find(pred func(K, V) bool) Optional[Pair[K, V]] {
 	for k, v := range iter.Seq2[K, V](s) {
 		if pred(k, v) {
-			return k, v, true
+			return Some(Pair[K, V]{Left: k, Right: v})
 		}
 	}
-	var zk K
-	var zv V
-	return zk, zv, false
+	return None[Pair[K, V]]()
 }
 
 // Any reports whether any pair satisfies pred (short-circuits on first match).

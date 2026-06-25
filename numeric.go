@@ -11,9 +11,9 @@ import (
 // (whose T is any). They are the free-function counterpart to the SeqNumeric /
 // SeqOrdered subtype methods (issue #10) and keep identical semantics.
 
-// Max returns the maximum element of s by the natural ordering, or (zero,
-// false) if s is empty.
-func Max[T cmp.Ordered](s Seq[T]) (T, bool) {
+// Max returns the maximum element of s by the natural ordering, or None if s
+// is empty.
+func Max[T cmp.Ordered](s Seq[T]) Optional[T] {
 	var best T
 	first := true
 	for v := range iter.Seq[T](s) {
@@ -26,12 +26,15 @@ func Max[T cmp.Ordered](s Seq[T]) (T, bool) {
 			best = v
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
-// Min returns the minimum element of s by the natural ordering, or (zero,
-// false) if s is empty.
-func Min[T cmp.Ordered](s Seq[T]) (T, bool) {
+// Min returns the minimum element of s by the natural ordering, or None if s
+// is empty.
+func Min[T cmp.Ordered](s Seq[T]) Optional[T] {
 	var best T
 	first := true
 	for v := range iter.Seq[T](s) {
@@ -44,7 +47,10 @@ func Min[T cmp.Ordered](s Seq[T]) (T, bool) {
 			best = v
 		}
 	}
-	return best, !first
+	if first {
+		return None[T]()
+	}
+	return Some(best)
 }
 
 // Sum returns the sum of all elements. An empty sequence yields the zero

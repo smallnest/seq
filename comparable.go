@@ -38,30 +38,28 @@ func Contains[T comparable](s Seq[T], v T) bool {
 	return false
 }
 
-// IndexOf returns the first index of v in s, or (0, false) if v is absent.
-// (The index is meaningless when not found; the bool is the authoritative
-// signal.)
-func IndexOf[T comparable](s Seq[T], v T) (int, bool) {
+// IndexOf returns the first index of v in s, or None if v is absent.
+func IndexOf[T comparable](s Seq[T], v T) Optional[int] {
 	i := 0
 	for x := range iter.Seq[T](s) {
 		if x == v {
-			return i, true
+			return Some(i)
 		}
 		i++
 	}
-	return 0, false
+	return None[int]()
 }
 
-// LastIndexOf returns the last index of v in s, or (0, false) if v is absent.
-// It materializes the input internally to scan from the end.
-func LastIndexOf[T comparable](s Seq[T], v T) (int, bool) {
+// LastIndexOf returns the last index of v in s, or None if v is absent. It
+// materializes the input internally to scan from the end.
+func LastIndexOf[T comparable](s Seq[T], v T) Optional[int] {
 	collected := slices.Collect(iter.Seq[T](s))
 	for i := len(collected) - 1; i >= 0; i-- {
 		if collected[i] == v {
-			return i, true
+			return Some(i)
 		}
 	}
-	return 0, false
+	return None[int]()
 }
 
 // CountValues returns a map from each element to the number of times it
