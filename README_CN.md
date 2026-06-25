@@ -92,8 +92,21 @@ type Seq2[K, V any]  iter.Seq2[K, V]
 | 约束型子类型 | 函数（入口）+ 方法 | `Comparable`/`Ordered`/`Numbers` 进入；之后链式 `.Distinct()`、`.Max()`、`.Sum()`；用 `.Ordered()`/`.Comparable()` 降级 |
 | 多序列 | 自由函数 | `Zip`/`Zip3`/`Zip4`、`ZipWith`、`ZipMap`、`Unzip`、`Flatten`、`Concat`、`Interleave` |
 | `Seq2[K,V]` | 方法 + 函数 | `MapValues`、`MapKeys`、`Keys`、`Values`；`ToMap`、`CollectPairs`、`Associate` |
+| `Optional[T]` | 类型 + 方法 + 函数 | `Some`/`None`/`ToOptional`；`Get`、`Unwrap`/`UnwrapOr`/`OrElse`、`Map`、`Filter`、`FlatMap`；`MapOptional`（可改类型） |
 
 完整、权威的清单（每条附一句语义）将放在 `API.md`。设计取舍见 [`tasks/design-seq.md`](tasks/design-seq.md)，完整 API 清单见 [`tasks/prd-seq-api-inventory.md`](tasks/prd-seq-api-inventory.md)。
+
+### Optional[T]
+
+`Optional[T]` 是对 `Find`、`First`、`Last`、`Nth`、`Reduce` 等方法所返回 `(T, bool)` 的零依赖、可选包装。它只是调用方侧的语法糖——**没有任何 `Seq`/`Seq2` 方法接受或返回它**，因此包仍保持与 `iter.Seq`、标准库的零成本互操作。用 `ToOptional` 从任意 `(T, bool)` 方法桥接：
+
+```go
+out := seq.ToOptional(s.Find(func(x int) bool { return x > 2 })).
+    Map(func(x int) int { return x * 10 }).
+    OrElse(-1)
+```
+
+由于 Go 方法不能引入新类型参数，`Optional.Map` 只能同类型转换；要改变元素类型（如 `Optional[int]` → `Optional[string]`）用包级 `MapOptional[T, U]`。
 
 ## 范围边界
 

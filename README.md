@@ -92,8 +92,21 @@ The rule is mechanically checkable: ask "does it constrain `T` itself?" If yes, 
 | Constrained subtypes | functions (entry) + methods | `Comparable`/`Ordered`/`Numbers` enter; then chain `.Distinct()`, `.Max()`, `.Sum()`; downgrade with `.Ordered()`/`.Comparable()` |
 | Multi-sequence | free functions | `Zip`/`Zip3`/`Zip4`, `ZipWith`, `ZipMap`, `Unzip`, `Flatten`, `Concat`, `Interleave` |
 | `Seq2[K,V]` | methods + functions | `MapValues`, `MapKeys`, `Keys`, `Values`; `ToMap`, `CollectPairs`, `Associate` |
+| `Optional[T]` | type + methods + function | `Some`/`None`/`ToOptional`; `Get`, `Unwrap`/`UnwrapOr`/`OrElse`, `Map`, `Filter`, `FlatMap`; `MapOptional` (type-changing) |
 
 The full, authoritative list with one-line semantics for each entry will live in `API.md`. The design rationale is in [`tasks/design-seq.md`](tasks/design-seq.md); the complete API inventory is in [`tasks/prd-seq-api-inventory.md`](tasks/prd-seq-api-inventory.md).
+
+### Optional[T]
+
+`Optional[T]` is a zero-dependency, opt-in wrapper over the `(T, bool)` pair returned by `Find`, `First`, `Last`, `Nth`, `Reduce` and the other partial-result methods. It exists only as caller-side sugar — **no `Seq`/`Seq2` method takes or returns it**, so the package keeps its zero-cost interop with `iter.Seq` and the standard library. Bridge from any `(T, bool)` method with `ToOptional`:
+
+```go
+out := seq.ToOptional(s.Find(func(x int) bool { return x > 2 })).
+    Map(func(x int) int { return x * 10 }).
+    OrElse(-1)
+```
+
+Because Go methods cannot introduce new type parameters, `Optional.Map` is same-type only; use the package-level `MapOptional[T, U]` to change the element type (e.g. `Optional[int]` → `Optional[string]`).
 
 ## Scope
 
