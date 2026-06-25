@@ -27,7 +27,7 @@ func ExampleSeq_Map() {
 // ExampleRange builds a sequence of integers and reduces it to their sum,
 // using the named [Add] operator instead of a closure.
 func ExampleRange() {
-	total, _ := Range(1, 5).Reduce(Add)
+	total := Range(1, 5).Reduce(Add).OrZero()
 	fmt.Println(total)
 	// Output: 10
 }
@@ -64,7 +64,7 @@ func ExampleZip() {
 // ExampleAdd uses the named Add operator as a Reduce reducer, avoiding a
 // func(a, b int) int { return a + b } closure.
 func ExampleAdd() {
-	sum, _ := From([]int{1, 2, 3, 4}).Reduce(Add)
+	sum := From([]int{1, 2, 3, 4}).Reduce(Add).OrZero()
 	fmt.Println(sum)
 	// Output: 10
 }

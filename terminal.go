@@ -32,8 +32,8 @@ func (s Seq[T]) ForEachIndexed(f func(int, T)) {
 }
 
 // Reduce folds the sequence with f, starting from the first element. An empty
-// sequence returns (zero, false).
-func (s Seq[T]) Reduce(f func(T, T) T) (T, bool) {
+// sequence returns None.
+func (s Seq[T]) Reduce(f func(T, T) T) Optional[T] {
 	var acc T
 	first := true
 	for v := range iter.Seq[T](s) {
@@ -44,7 +44,10 @@ func (s Seq[T]) Reduce(f func(T, T) T) (T, bool) {
 		}
 		acc = f(acc, v)
 	}
-	return acc, !first
+	if first {
+		return None[T]()
+	}
+	return Some(acc)
 }
 
 // Count returns the number of elements.
@@ -67,34 +70,31 @@ func (s Seq[T]) CountBy(pred func(T) bool) int {
 	return n
 }
 
-// Find returns the first element satisfying pred, or (zero, false).
-func (s Seq[T]) Find(pred func(T) bool) (T, bool) {
+// Find returns the first element satisfying pred, or None.
+func (s Seq[T]) Find(pred func(T) bool) Optional[T] {
 	for v := range iter.Seq[T](s) {
 		if pred(v) {
-			return v, true
+			return Some(v)
 		}
 	}
-	var zero T
-	return zero, false
+	return None[T]()
 }
 
-// FindIndex returns the index of the first element satisfying pred, or
-// (0, false).
-func (s Seq[T]) FindIndex(pred func(T) bool) (int, bool) {
+// FindIndex returns the index of the first element satisfying pred, or None.
+func (s Seq[T]) FindIndex(pred func(T) bool) Optional[int] {
 	i := 0
 	for v := range iter.Seq[T](s) {
 		if pred(v) {
-			return i, true
+			return Some(i)
 		}
 		i++
 	}
-	return 0, false
+	return None[int]()
 }
 
 // FindLast returns the last element satisfying pred (lodash findLast). It must
-// scan the whole sequence to find the last match. Returns (zero, false) if
-// none match.
-func (s Seq[T]) FindLast(pred func(T) bool) (T, bool) {
+// scan the whole sequence to find the last match. Returns None if none match.
+func (s Seq[T]) FindLast(pred func(T) bool) Optional[T] {
 	var found T
 	ok := false
 	for v := range iter.Seq[T](s) {
@@ -103,12 +103,14 @@ func (s Seq[T]) FindLast(pred func(T) bool) (T, bool) {
 			ok = true
 		}
 	}
-	return found, ok
+	if !ok {
+		return None[T]()
+	}
+	return Some(found)
 }
 
-// FindLastIndex returns the index of the last element satisfying pred, or
-// (0, false).
-func (s Seq[T]) FindLastIndex(pred func(T) bool) (int, bool) {
+// FindLastIndex returns the index of the last element satisfying pred, or None.
+func (s Seq[T]) FindLastIndex(pred func(T) bool) Optional[int] {
 	idx := 0
 	ok := false
 	i := 0
@@ -119,7 +121,10 @@ func (s Seq[T]) FindLastIndex(pred func(T) bool) (int, bool) {
 		}
 		i++
 	}
-	return idx, ok
+	if !ok {
+		return None[int]()
+	}
+	return Some(idx)
 }
 
 // Any reports whether any element satisfies pred (short-circuits on first
@@ -155,43 +160,43 @@ func (s Seq[T]) None(pred func(T) bool) bool {
 	return true
 }
 
-// First returns the first element, or (zero, false) if empty.
-func (s Seq[T]) First() (T, bool) {
+// First returns the first element, or None if empty.
+func (s Seq[T]) First() Optional[T] {
 	for v := range iter.Seq[T](s) {
-		return v, true
+		return Some(v)
 	}
-	var zero T
-	return zero, false
+	return None[T]()
 }
 
 // Last returns the last element. It must scan the whole sequence. Returns
-// (zero, false) if empty.
-func (s Seq[T]) Last() (T, bool) {
+// None if empty.
+func (s Seq[T]) Last() Optional[T] {
 	var last T
 	ok := false
 	for v := range iter.Seq[T](s) {
 		last = v
 		ok = true
 	}
-	return last, ok
+	if !ok {
+		return None[T]()
+	}
+	return Some(last)
 }
 
-// Nth returns the zero-based nth element, or (zero, false) if out of range.
-// n < 0 is out of range.
-func (s Seq[T]) Nth(n int) (T, bool) {
+// Nth returns the zero-based nth element, or None if out of range. n < 0 is
+// out of range.
+func (s Seq[T]) Nth(n int) Optional[T] {
 	if n < 0 {
-		var zero T
-		return zero, false
+		return None[T]()
 	}
 	i := 0
 	for v := range iter.Seq[T](s) {
 		if i == n {
-			return v, true
+			return Some(v)
 		}
 		i++
 	}
-	var zero T
-	return zero, false
+	return None[T]()
 }
 
 // IsEmpty reports whether the sequence yields no elements. It short-circuits

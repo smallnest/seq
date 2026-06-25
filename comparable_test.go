@@ -34,28 +34,28 @@ func TestContains(t *testing.T) {
 }
 
 func TestIndexOf(t *testing.T) {
-	if idx, ok := IndexOf(From([]string{"a", "b", "a"}), "a"); !ok || idx != 0 {
+	if idx, ok := IndexOf(From([]string{"a", "b", "a"}), "a").Get(); !ok || idx != 0 {
 		t.Fatalf("IndexOf first a: (%d,%v)", idx, ok)
 	}
-	if idx, ok := IndexOf(From([]string{"a", "b", "c"}), "b"); !ok || idx != 1 {
+	if idx, ok := IndexOf(From([]string{"a", "b", "c"}), "b").Get(); !ok || idx != 1 {
 		t.Fatalf("IndexOf b: (%d,%v)", idx, ok)
 	}
-	if _, ok := IndexOf(From([]string{"a", "b"}), "z"); ok {
-		t.Fatal("IndexOf absent should be false")
+	if IndexOf(From([]string{"a", "b"}), "z").IsPresent() {
+		t.Fatal("IndexOf absent should be None")
 	}
-	if _, ok := IndexOf(From([]int{}), 1); ok {
-		t.Fatal("IndexOf empty should be false")
+	if IndexOf(From([]int{}), 1).IsPresent() {
+		t.Fatal("IndexOf empty should be None")
 	}
 }
 
 func TestLastIndexOf(t *testing.T) {
-	if idx, ok := LastIndexOf(From([]string{"a", "b", "a", "c", "a"}), "a"); !ok || idx != 4 {
+	if idx, ok := LastIndexOf(From([]string{"a", "b", "a", "c", "a"}), "a").Get(); !ok || idx != 4 {
 		t.Fatalf("LastIndexOf a: (%d,%v)", idx, ok)
 	}
-	if _, ok := LastIndexOf(From([]string{"a", "b"}), "z"); ok {
+	if LastIndexOf(From([]string{"a", "b"}), "z").IsPresent() {
 		t.Fatal("LastIndexOf absent")
 	}
-	if _, ok := LastIndexOf(From([]int{}), 1); ok {
+	if LastIndexOf(From([]int{}), 1).IsPresent() {
 		t.Fatal("LastIndexOf empty")
 	}
 }
@@ -181,27 +181,27 @@ func TestSymmetricDifference(t *testing.T) {
 }
 
 func TestMaxMin(t *testing.T) {
-	mx, ok := Max(From([]int{3, 1, 4, 1, 5, 9, 2, 6}))
+	mx, ok := Max(From([]int{3, 1, 4, 1, 5, 9, 2, 6})).Get()
 	if !ok || mx != 9 {
 		t.Fatalf("Max: (%d,%v)", mx, ok)
 	}
-	mn, ok := Min(From([]int{3, 1, 4, 1, 5, 9, 2, 6}))
+	mn, ok := Min(From([]int{3, 1, 4, 1, 5, 9, 2, 6})).Get()
 	if !ok || mn != 1 {
 		t.Fatalf("Min: (%d,%v)", mn, ok)
 	}
-	if _, ok := Max(From([]int{})); ok {
-		t.Fatal("Max empty should be false")
+	if Max(From([]int{})).IsPresent() {
+		t.Fatal("Max empty should be None")
 	}
-	if _, ok := Min(From([]int{})); ok {
-		t.Fatal("Min empty should be false")
+	if Min(From([]int{})).IsPresent() {
+		t.Fatal("Min empty should be None")
 	}
 	// floats
-	fmx, _ := Max(From([]float64{1.5, 2.5, 0.5}))
+	fmx := Max(From([]float64{1.5, 2.5, 0.5})).OrZero()
 	if fmx != 2.5 {
 		t.Fatalf("Max float: %v", fmx)
 	}
 	// strings (cmp.Ordered)
-	smax, _ := Max(From([]string{"apple", "banana", "cherry"}))
+	smax := Max(From([]string{"apple", "banana", "cherry"})).OrZero()
 	if smax != "cherry" {
 		t.Fatalf("Max string: %q", smax)
 	}

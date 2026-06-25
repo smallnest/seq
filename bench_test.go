@@ -31,10 +31,10 @@ func BenchmarkStreamingChain(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		acc, _ := src.
+		acc := src.
 			Filter(func(x int) bool { return x%2 == 0 }).
 			Map(func(x int) int { return x * 2 }).
-			Reduce(func(a, b int) int { return a + b })
+			Reduce(func(a, b int) int { return a + b }).OrZero()
 		sink += acc
 	}
 }

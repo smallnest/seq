@@ -61,7 +61,7 @@ type Seq2[K, V any]  iter.Seq2[K, V]
 
   ```go
   func Distinct[T comparable](s Seq[T]) Seq[T]
-  func Max[T cmp.Ordered](s Seq[T]) (T, bool)
+  func Max[T cmp.Ordered](s Seq[T]) Optional[T]
   func Sum[T Numeric](s Seq[T]) T
   ```
 
@@ -99,13 +99,21 @@ type Seq2[K, V any]  iter.Seq2[K, V]
 
 ### Optional[T]
 
-`Optional[T]` 是对 `Find`、`First`、`Last`、`Nth`、`Reduce` 等方法所返回 `(T, bool)` 的零依赖、可选包装。它只是调用方侧的语法糖——**没有任何 `Seq`/`Seq2` 方法接受或返回它**，因此包仍保持与 `iter.Seq`、标准库的零成本互操作。用 `ToOptional` 从任意 `(T, bool)` 方法桥接：
+`Optional[T]` 是表达"可能没有结果"的零依赖类型。所有可能无结果的终端操作——`Find`、`FindLast`、`First`、`Last`、`Nth`、`Reduce`、`MaxBy`/`MinBy`/`MaxByKey`/`MinByKey`、包级 `Max`/`Min`，以及返回下标的 `FindIndex`/`IndexOf`/`LastIndexOf`（为 `Optional[int]`）——都**直接返回 `Optional`**，可直接链式后处理，无需解包：
 
 ```go
-out := seq.ToOptional(s.Find(func(x int) bool { return x > 2 })).
+out := s.Find(func(x int) bool { return x > 2 }).
     Map(func(x int) int { return x * 10 }).
     OrElse(-1)
 ```
+
+`Seq2.Find` 返回 `Optional[Pair[K, V]]`（键值用 `Pair` 包裹）。要回到 Go 惯用的 `(value, ok)` 双值，调用 `.Get()`：
+
+```go
+if v, ok := s.Max().Get(); ok { use(v) }
+```
+
+反向地，`ToOptional(v, ok)` 把遗留的 `(value, ok)` 双值包装成 `Optional`。
 
 由于 Go 方法不能引入新类型参数，`Optional.Map` 只能同类型转换；要改变元素类型（如 `Optional[int]` → `Optional[string]`）用包级 `MapOptional[T, U]`。
 
