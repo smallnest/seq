@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>seq — lazy chainable collection pipelines · Go 1.27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  href="https://fonts.googleapis.cn/css2?family=Chivo+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap"
+  rel="stylesheet"
+/>
+<style>
+:root{
+  --bg:#faf9f5; --bg-card:#ffffff; --ink:#2d2a26; --ink-soft:#5c574f;
+  --line:#e8e4dc; --accent:#d97757; --accent-soft:#f5ede9; --code-bg:#f6f4ef;
+  --code-ink:#3d3a34; --kw:#a64d2e; --str:#5b7c4d; --com:#9c968a; --num:#8a6d3b;
+  --shadow:0 1px 3px rgba(60,55,45,.06),0 4px 16px rgba(60,55,45,.04);
+  --font-base:"Inter",ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+  --font-serif:"Newsreader","Times New Roman",Times,serif;
+  --font-mono:"Chivo Mono","LXGW WenKai Mono","SF Mono","Fira Code","Fira Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--font-base);
+  font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+code,pre{font-family:var(--font-mono)}
+.layout{display:flex;max-width:1280px;margin:0 auto}
+/* Sidebar */
+.sidebar{
+  width:248px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;
+  padding:28px 16px 40px 24px;border-right:1px solid var(--line);
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+}
+.sidebar::-webkit-scrollbar{width:8px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{
+  background-color:transparent;border-radius:8px;
+  border:2px solid transparent;background-clip:content-box;
+  transition:background-color .2s ease;
+}
+.sidebar:hover::-webkit-scrollbar-thumb{background-color:#dcd6cb;background-clip:content-box}
+.sidebar::-webkit-scrollbar-thumb:hover{background-color:var(--accent);background-clip:content-box}
+.sidebar h1{font-family:var(--font-serif);font-size:20px;letter-spacing:-.3px;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.sidebar h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.sidebar .tag{font-size:12px;color:var(--ink-soft);margin-bottom:22px}
+.nav-group{margin-bottom:6px}
+.nav-group>a{
+  display:block;font-size:13.5px;font-weight:600;color:var(--ink);
+  padding:6px 10px;border-radius:7px;text-decoration:none;
+}
+.nav-group>a:hover{background:var(--accent-soft)}
+.nav-group .count{color:var(--accent);font-size:11px;font-weight:600}
+.main{flex:1;min-width:0;padding:44px 56px 120px}
+.hero{margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid var(--line)}
+.hero h2{font-family:var(--font-serif);font-size:34px;letter-spacing:-.8px;line-height:1.2;margin-bottom:14px}
+.hero p{font-size:16px;color:var(--ink-soft);margin-bottom:10px}
+.hero .badges{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap}
+.badge{font-size:12px;padding:4px 11px;border-radius:20px;background:var(--accent-soft);color:var(--kw);font-weight:600}
+.intro-code{margin-top:24px}
+section{margin-bottom:52px;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;padding-top:8px}
+.sec-head h3{font-family:var(--font-serif);font-size:23px;letter-spacing:-.4px}
+.sec-head .cnt{font-size:12.5px;color:var(--accent);font-weight:600;background:var(--accent-soft);padding:2px 9px;border-radius:12px}
+.sec-desc{color:var(--ink-soft);font-size:14.5px;margin-bottom:22px}
+.fn{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+.fn-note{background:var(--accent-soft);border-color:#eccdbf;border-left:3px solid var(--accent)}
+.fn-note .fn-sig{color:var(--kw)}
+.fn-note .fn-desc{color:var(--ink)}
+.fn-sig{font-size:14px;color:var(--kw);font-weight:600;margin-bottom:7px;word-break:break-word}
+.fn-desc{font-size:14px;color:var(--ink-soft);margin-bottom:12px}
+pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--code-ink)}
+pre .kw{color:var(--kw)}pre .str{color:var(--str)}pre .com{color:var(--com)}pre .num{color:var(--num)}pre .out{color:var(--accent)}
+pre .ex-link{color:var(--accent);text-decoration:underline}
+.foot{color:var(--ink-soft);font-size:13px;border-top:1px solid var(--line);padding-top:24px;margin-top:40px}
+.foot a{color:var(--accent)}
+.lang-switch{display:flex;gap:2px;margin-top:14px;background:var(--accent-soft);border-radius:8px;padding:3px;width:fit-content}
+.lang-switch a{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-decoration:none;padding:4px 12px;border-radius:6px;transition:background .15s,color .15s}
+.lang-switch a.active{background:var(--bg-card);color:var(--accent);box-shadow:var(--shadow)}
+.lang-switch a:not(.active):hover{color:var(--ink)}
+@media(max-width:880px){.sidebar{display:none}.main{padding:28px 20px 80px}.hero h2{font-size:27px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <h1><span class="dot"></span>seq</h1>
+  <div class="tag">Lazy chainable collection pipelines · Go 1.27</div>
+  <div class="lang-switch">
+    <a href="zh.html">中文</a>
+    <a href="en.html" class="active">EN</a>
+  </div>
+  <nav id="nav"></nav>
+</aside>
+<main class="main">
+  <div class="hero">
+    <h2>seq — read your data flow left to right</h2>
+    <p>Lazy, chainable collection pipelines built on the standard library's <code>iter.Seq</code> / <code>iter.Seq2</code>, using Go 1.27 generic methods (<code>golang/go#77273</code>) to enable chained calls that change the element type.</p>
+    <p><code>Seq[T]</code> is a defined type of <code>iter.Seq[T]</code> — <strong>zero-cost convertible</strong>, ready to feed into <code>slices.Collect</code> and <code>maps.Keys</code>. Zero third-party dependencies.</p>
+    <div class="badges">
+      <span class="badge">Go 1.27</span><span class="badge">zero deps</span>
+      <span class="badge">lazy</span><span class="badge">120+ ops</span>
+    </div>
+    <div class="intro-code">
+<pre><span class="kw">import</span> <span class="str">"github.com/smallnest/seq"</span>
+
+seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>}).
+    Filter(<span class="kw">func</span>(n <span class="kw">int</span>) <span class="kw">bool</span> { <span class="kw">return</span> n%<span class="num">2</span> == <span class="num">0</span> }).
+    Map(strconv.Itoa).
+    Collect() <span class="com">// ["2" "4"]</span></pre>
+    </div>
+  </div>
+  <div id="content"></div>
+  <div class="foot">
+    <p>Generated from <strong>seq</strong> source docs · Design follows the "partition rule": constrained operations (<code>comparable</code>/<code>Ordered</code>/<code>Numeric</code>) are free functions or subtype methods, not <code>Seq[T]</code> methods.</p>
+    <p>Repository: <a href="https://github.com/smallnest/seq">github.com/smallnest/seq</a></p>
+  </div>
+</main>
+</div>
+<script id="data" type="application/json">
+{"groups":[
+{"id":"ctor","title":"Constructors","cnt":"12 free functions","desc":"The entry point of every pipeline. Returns an unevaluated, lazy Seq — nothing runs until a terminal operation drives it. Infinite sources (Generate/Iterate/RepeatInf) must be bounded by Take or similar.","fns":[
+ {"sig":"From[T any](s []T) Seq[T]","desc":"Build a Seq from a slice; re-iterable, does not copy the underlying slice.","ex":"seq.From([]int{1,2,3}).Collect() // [1 2 3]"},
+ {"sig":"Of[T any](items ...T) Seq[T]","desc":"Build a Seq from a variadic argument list.","ex":"seq.Of(\"a\",\"b\",\"c\").Collect() // [a b c]"},
+ {"sig":"Empty[T any]() Seq[T]","desc":"Build an empty Seq that yields no elements.","ex":"seq.Empty[int]().Count() // 0"},
+ {"sig":"Range(start, end int) Seq[int]","desc":"Integers over [start,end); descending when start>end.","ex":"seq.Range(0,4).Collect() // [0 1 2 3]"},
+ {"sig":"RangeStep(start, end, step int) Seq[int]","desc":"Step from start toward end by step; step<=0 yields empty.","ex":"seq.RangeStep(0,10,3).Collect() // [0 3 6 9]"},
+ {"sig":"Repeat[T any](n int, v T) Seq[T]","desc":"Yield v exactly n times; n<=0 yields empty.","ex":"seq.Repeat(3,\"x\").Collect() // [x x x]"},
+ {"sig":"RepeatInf[T any](v T) Seq[T]","desc":"Yield v infinitely; must be consumed by a bounding operation.","ex":"seq.RepeatInf(7).Take(2).Collect() // [7 7]"},
+ {"sig":"Generate[T any](f func() T) Seq[T]","desc":"Call f infinitely to produce elements; must be bounded.","ex":"i:=0; seq.Generate(func()int{i++;return i}).Take(3).Collect() // [1 2 3]"},
+ {"sig":"Iterate[T any](init T, f func(T) T) Seq[T]","desc":"Infinite sequence init,f(init),f(f(init))…; must be bounded.","ex":"seq.Iterate(1,func(n int)int{return n*2}).Take(4).Collect() // [1 2 4 8]"},
+ {"sig":"Times[T any](n int, f func(int) T) Seq[T]","desc":"Yield f(0)…f(n-1); n<=0 yields empty and never calls f.","ex":"seq.Times(5,func(i int)int{return i*i}).Collect() // [0 1 4 9 16]"},
+ {"sig":"FromChannel[T any](ch <-chan T) Seq[T]","desc":"Build a Seq by draining a receive-only channel; single-use source.","ex":"seq.FromChannel(ch).Collect() // drains all values from ch"},
+ {"sig":"FromMap[K comparable, V any](m map[K]V) Seq2[K, V]","desc":"Build a Seq2 from a map's key-value pairs; order follows Go map range.","ex":"seq.FromMap(map[string]int{\"a\":1}).Count() // 1"}
+]},
+{"id":"inter","title":"Intermediate (lazy)","cnt":"24 methods","desc":"Return a new Seq without evaluating immediately; chain infinitely. Type-changing ops (Map/FlatMap/Scan) rely on Go 1.27 generic methods.","fns":[
+ {"sig":"(s Seq[T]) Map[U any](f func(T) U) Seq[U]","desc":"Apply f to each element; may change the element type.","ex":"seq.From([]int{1,2}).Map(strconv.Itoa).Collect() // [\"1\" \"2\"]"},
+ {"sig":"(s Seq[T]) FlatMap[U any](f func(T) Seq[U]) Seq[U]","desc":"Map each element to a Seq, then flatten.","ex":"seq.Of(1,2).FlatMap(func(n int)seq.Seq[int]{return seq.Of(n,n)}).Collect() // [1 1 2 2]"},
+ {"sig":"(s Seq[T]) FilterMap[U any](f func(T) (U, bool)) Seq[U]","desc":"Filter + map in one: drop when f returns false.","ex":"seq.Of(1,2,3).FilterMap(func(n int)(int,bool){return n*10,n%2==1}).Collect() // [10 30]"},
+ {"sig":"(s Seq[T]) Filter(pred func(T) bool) Seq[T]","desc":"Keep elements satisfying the predicate.","ex":"seq.Range(0,5).Filter(func(n int)bool{return n>2}).Collect() // [3 4]"},
+ {"sig":"(s Seq[T]) Reject(pred func(T) bool) Seq[T]","desc":"Inverse of Filter: drop elements satisfying the predicate.","ex":"seq.Range(0,5).Reject(func(n int)bool{return n>2}).Collect() // [0 1 2]"},
+ {"sig":"(s Seq[T]) Take(n int) Seq[T]","desc":"Take the first n elements (short-circuits).","ex":"seq.Range(0,100).Take(3).Collect() // [0 1 2]"},
+ {"sig":"(s Seq[T]) Drop(n int) Seq[T]","desc":"Skip the first n elements.","ex":"seq.Range(0,5).Drop(2).Collect() // [2 3 4]"},
+ {"sig":"(s Seq[T]) TakeWhile(pred func(T) bool) Seq[T]","desc":"Take from the start until the first element fails the predicate.","ex":"seq.Of(1,2,5,1).TakeWhile(func(n int)bool{return n<3}).Collect() // [1 2]"},
+ {"sig":"(s Seq[T]) DropWhile(pred func(T) bool) Seq[T]","desc":"Drop the leading run of elements satisfying the predicate.","ex":"seq.Of(1,2,5,1).DropWhile(func(n int)bool{return n<3}).Collect() // [5 1]"},
+ {"sig":"(s Seq[T]) Scan[U any](init U, f func(U, T) U) Seq[U]","desc":"Yield the running accumulation at each step (including the initial value).","ex":"seq.Of(1,2,3).Scan(0,func(a,b int)int{return a+b}).Collect() // [0 1 3 6]"},
+ {"sig":"(s Seq[T]) Peek(f func(T)) Seq[T]","desc":"Run side-effect f on each element and pass it through.","ex":"seq.Of(1,2).Peek(func(n int){log.Print(n)}).Collect() // [1 2], with logging"},
+ {"sig":"(s Seq[T]) Intersperse(sep T) Seq[T]","desc":"Insert a separator value between adjacent elements.","ex":"seq.Of(1,2,3).Intersperse(0).Collect() // [1 0 2 0 3]"},
+ {"sig":"(s Seq[T]) Concat(other Seq[T]) Seq[T]","desc":"Append another Seq to the end.","ex":"seq.Of(1,2).Concat(seq.Of(3,4)).Collect() // [1 2 3 4]"},
+ {"sig":"(s Seq[T]) DistinctBy[K comparable](key func(T) K) Seq[T]","desc":"Deduplicate by key, keeping first occurrence.","ex":"seq.Of(\"aa\",\"bb\",\"cc\").DistinctBy(func(s string)int{return len(s)}).Collect() // [aa]"},
+ {"sig":"(s Seq[T]) Chunk(size int) iter.Seq[Seq[T]]","desc":"Split into fixed-size chunks.","ex":"for c:=range seq.From([]int{1,2,3,4,5}).Chunk(2){fmt.Print(c.Collect())} // [1 2][3 4][5]"},
+ {"sig":"(s Seq[T]) Window(size, step int) iter.Seq[Seq[T]]","desc":"Sliding window of width size and stride step.","ex":"for w:=range seq.From([]int{1,2,3,4}).Window(2,1){fmt.Print(w.Collect())} // [1 2][2 3][3 4]"},
+ {"sig":"(s Seq[T]) TakeRight(n int) Seq[T]","desc":"Take the last n elements (needs buffering).","ex":"seq.Range(0,5).TakeRight(2).Collect() // [3 4]"},
+ {"sig":"(s Seq[T]) DropRight(n int) Seq[T]","desc":"Drop the last n elements (needs buffering).","ex":"seq.Range(0,5).DropRight(2).Collect() // [0 1 2]"},
+ {"sig":"(s Seq[T]) Slice(start, end int) Seq[T]","desc":"Take elements over index range [start,end).","ex":"seq.Range(0,10).Slice(2,5).Collect() // [2 3 4]"},
+ {"sig":"(s Seq[T]) Init() Seq[T]","desc":"All elements except the last.","ex":"seq.Of(1,2,3).Init().Collect() // [1 2]"},
+ {"sig":"(s Seq[T]) Tail() Seq[T]","desc":"All elements except the first.","ex":"seq.Of(1,2,3).Tail().Collect() // [2 3]"},
+ {"sig":"(s Seq[T]) SortBy(less func(a, b T) bool) Seq[T]","desc":"Sort by a custom comparator (materializes).","ex":"seq.Of(3,1,2).SortBy(func(a,b int)bool{return a<b}).Collect() // [1 2 3]"},
+ {"sig":"(s Seq[T]) Reverse() Seq[T]","desc":"Reverse the order (materializes).","ex":"seq.Of(1,2,3).Reverse().Collect() // [3 2 1]"},
+ {"sig":"(s Seq[T]) Enumerate() Seq2[int, T]","desc":"Pair each element with a 0-based index, yielding a Seq2.","ex":"seq.ToMap(seq.Of(\"a\",\"b\").Enumerate()) // {0:a,1:b}"}
+]},
+{"id":"term","title":"Terminal operations","cnt":"21 methods","desc":"Drive evaluation and return a non-Seq result. Find/First/Last/Nth/Reduce use Optional to express \"may have no value\".","fns":[
+ {"sig":"(s Seq[T]) Collect() []T","desc":"Materialize into a slice, driving the whole pipeline.","ex":"seq.Range(0,3).Collect() // [0 1 2]"},
+ {"sig":"(s Seq[T]) ForEach(f func(T))","desc":"Call f on each element.","ex":"seq.Of(1,2).ForEach(func(n int){fmt.Print(n)}) // 12"},
+ {"sig":"(s Seq[T]) ForEachIndexed(f func(int, T))","desc":"Call f on each element with its index.","ex":"seq.Of(\"a\").ForEachIndexed(func(i int,v string){fmt.Print(i,v)}) // 0 a"},
+ {"sig":"(s Seq[T]) Reduce(f func(T, T) T) Optional[T]","desc":"Fold starting from the first element; empty sequence returns None.","ex":"seq.Of(1,2,3).Reduce(func(a,b int)int{return a+b}).OrZero() // 6"},
+ {"sig":"(s Seq[T]) Count() int","desc":"Number of elements.","ex":"seq.Range(0,5).Count() // 5"},
+ {"sig":"(s Seq[T]) CountBy(pred func(T) bool) int","desc":"Number of elements satisfying the predicate.","ex":"seq.Range(0,5).CountBy(func(n int)bool{return n%2==0}) // 3"},
+ {"sig":"(s Seq[T]) Find(pred func(T) bool) Optional[T]","desc":"First element satisfying the predicate (short-circuits); returns Optional.","ex":"seq.Of(1,2,3).Find(func(n int)bool{return n>1}).OrElse(-1) // 2"},
+ {"sig":"(s Seq[T]) FindIndex(pred func(T) bool) Optional[int]","desc":"Index of the first element satisfying the predicate; None if no match.","ex":"seq.Of(1,2,3).FindIndex(func(n int)bool{return n>1}).OrElse(-1) // 1"},
+ {"sig":"(s Seq[T]) FindLast(pred func(T) bool) Optional[T]","desc":"Last element satisfying the predicate (full scan).","ex":"seq.Of(1,2,3).FindLast(func(n int)bool{return n<3}).OrZero() // 2"},
+ {"sig":"(s Seq[T]) FindLastIndex(pred func(T) bool) Optional[int]","desc":"Index of the last element satisfying the predicate.","ex":"seq.Of(1,2,3).FindLastIndex(func(n int)bool{return n<3}).OrElse(-1) // 1"},
+ {"sig":"(s Seq[T]) Any(pred func(T) bool) bool","desc":"Whether any element satisfies the predicate (short-circuits).","ex":"seq.Of(1,2).Any(func(n int)bool{return n>1}) // true"},
+ {"sig":"(s Seq[T]) All(pred func(T) bool) bool","desc":"Whether all elements satisfy the predicate (short-circuits).","ex":"seq.Of(2,4).All(func(n int)bool{return n%2==0}) // true"},
+ {"sig":"(s Seq[T]) None(pred func(T) bool) bool","desc":"Whether no element satisfies the predicate (short-circuits).","ex":"seq.Of(1,3).None(func(n int)bool{return n%2==0}) // true"},
+ {"sig":"(s Seq[T]) First() Optional[T]","desc":"First element; None for an empty sequence.","ex":"seq.Of(9,8).First().OrZero() // 9"},
+ {"sig":"(s Seq[T]) Last() Optional[T]","desc":"Last element (full scan).","ex":"seq.Of(9,8).Last().OrZero() // 8"},
+ {"sig":"(s Seq[T]) Nth(n int) Optional[T]","desc":"The n-th (0-based) element; None if out of range.","ex":"seq.Range(0,5).Nth(2).OrElse(-1) // 2"},
+ {"sig":"(s Seq[T]) IsEmpty() bool","desc":"Whether there are no elements (short-circuits).","ex":"seq.Empty[int]().IsEmpty() // true"},
+ {"sig":"(s Seq[T]) Partition(pred func(T) bool) ([]T, []T)","desc":"Split into two by predicate: matching, then non-matching.","ex":"seq.Range(0,4).Partition(func(n int)bool{return n%2==0}) // [0 2],[1 3]"},
+ {"sig":"(s Seq[T]) Span(pred func(T) bool) ([]T, []T)","desc":"Split at the first element failing the predicate: prefix and rest.","ex":"seq.Of(1,2,5,1).Span(func(n int)bool{return n<3}) // [1 2],[5 1]"},
+ {"sig":"(s Seq[T]) Join(sep string, str func(T) string) string","desc":"Stringify each element then join with sep.","ex":"seq.Of(1,2,3).Join(\"-\",strconv.Itoa) // \"1-2-3\""}
+]},
+{"id":"agg","title":"Aggregation & grouping","cnt":"11","desc":"Folding, grouping, and key-based aggregation. GroupBy returns an unordered map; PartitionBy preserves first-seen key order. GroupCount/GroupBy/KeyBy/MaxByKey carry the constrained K via method-level type parameters.","fns":[
+ {"sig":"(s Seq[T]) Fold[U any](init U, f func(U, T) U) U","desc":"Fold from init; may change the accumulator type.","ex":"seq.Of(1,2,3).Fold(\"\",func(a string,n int)string{return a+strconv.Itoa(n)}) // \"123\""},
+ {"sig":"(s Seq[T]) GroupCount[K comparable](key func(T) K) map[K]int","desc":"Count elements per key.","ex":"seq.Of(1,2,3,4).GroupCount(func(n int)int{return n%2}) // {0:2,1:2}"},
+ {"sig":"(s Seq[T]) GroupBy[K comparable](key func(T) K) map[K][]T","desc":"Group into a map by key (unordered).","ex":"seq.Of(1,2,3).GroupBy(func(n int)int{return n%2}) // {1:[1 3],0:[2]}"},
+ {"sig":"PartitionBy[T any, K comparable](s Seq[T], key func(T) K) Seq2[K, []T]","desc":"Group by key, preserving first-seen key order. Lazy in type but materializes internally — do not use on infinite sequences.","ex":"for k,g:=range seq.PartitionBy(seq.Of(1,2,3,4),func(n int)int{return n%2}){fmt.Println(k,g)} // 1 [1 3] / 0 [2 4]"},
+ {"sig":"(s Seq[T]) KeyBy[K comparable](key func(T) K) map[K]T","desc":"Index into a map by key; later duplicates overwrite earlier.","ex":"seq.Of(\"a\",\"bb\").KeyBy(func(s string)int{return len(s)}) // {1:a,2:bb}"},
+ {"sig":"(s Seq[T]) MaxBy(less func(a, b T) bool) Optional[T]","desc":"Maximum element by comparator; None for empty.","ex":"seq.Of(1,3,2).MaxBy(func(a,b int)bool{return a<b}).OrZero() // 3"},
+ {"sig":"(s Seq[T]) MinBy(less func(a, b T) bool) Optional[T]","desc":"Minimum element by comparator.","ex":"seq.Of(1,3,2).MinBy(func(a,b int)bool{return a<b}).OrZero() // 1"},
+ {"sig":"(s Seq[T]) MaxByKey[K cmp.Ordered](key func(T) K) Optional[T]","desc":"Element with the maximum key by the key function.","ex":"seq.Of(\"a\",\"ccc\",\"bb\").MaxByKey(func(s string)int{return len(s)}).OrZero() // ccc"},
+ {"sig":"(s Seq[T]) MinByKey[K cmp.Ordered](key func(T) K) Optional[T]","desc":"Element with the minimum key by the key function.","ex":"seq.Of(\"a\",\"ccc\").MinByKey(func(s string)int{return len(s)}).OrZero() // a"},
+ {"sig":"(s Seq[T]) SumBy[U Numeric](f func(T) U) U","desc":"Apply f to each element then sum.","ex":"seq.Of(\"a\",\"bb\").SumBy(func(s string)int{return len(s)}) // 3"},
+ {"sig":"(s Seq[T]) MeanBy[U Numeric](f func(T) U) float64","desc":"Apply f to each element then average.","ex":"seq.Of(\"a\",\"bbb\").MeanBy(func(s string)int{return len(s)}) // 2"}
+]},
+{"id":"constrained","title":"Constrained free functions","cnt":"20","desc":"Operations requiring T to be comparable / cmp.Ordered / Numeric. Because Seq[T]'s T is any, by the \"partition rule\" these are free functions (or can be chained as methods via the constrained subtypes).","fns":[
+ {"sig":"Distinct[T comparable](s Seq[T]) Seq[T]","desc":"Deduplicate, keeping first occurrence; lazy.","ex":"seq.Distinct(seq.Of(1,1,2,3,2)).Collect() // [1 2 3]"},
+ {"sig":"Contains[T comparable](s Seq[T], v T) bool","desc":"Whether v is present (short-circuits).","ex":"seq.Contains(seq.Of(1,2,3),2) // true"},
+ {"sig":"IndexOf[T comparable](s Seq[T], v T) Optional[int]","desc":"Index of v's first occurrence; None if absent.","ex":"seq.IndexOf(seq.Of(\"a\",\"b\"),\"b\").OrElse(-1) // 1"},
+ {"sig":"LastIndexOf[T comparable](s Seq[T], v T) Optional[int]","desc":"Index of v's last occurrence.","ex":"seq.LastIndexOf(seq.Of(1,2,1),1).OrElse(-1) // 2"},
+ {"sig":"CountValues[T comparable](s Seq[T]) map[T]int","desc":"Frequency of each unique value.","ex":"seq.CountValues(seq.Of(\"a\",\"a\",\"b\")) // {a:2,b:1}"},
+ {"sig":"Equal[T comparable](a, b Seq[T]) bool","desc":"Whether two Seqs are element-wise equal.","ex":"seq.Equal(seq.Of(1,2),seq.Of(1,2)) // true"},
+ {"sig":"Compact[T comparable](s Seq[T]) Seq[T]","desc":"Remove all zero-value elements; lazy.","ex":"seq.Compact(seq.Of(0,1,0,2)).Collect() // [1 2]"},
+ {"sig":"Without[T comparable](s Seq[T], vals ...T) Seq[T]","desc":"Remove the given values; lazy.","ex":"seq.Without(seq.Of(1,2,3),2).Collect() // [1 3]"},
+ {"sig":"ToSet[T comparable](s Seq[T]) map[T]struct{}","desc":"Materialize into a set (map[T]struct{}).","ex":"seq.ToSet(seq.Of(1,1,2)) // {1:{},2:{}}"},
+ {"sig":"JoinStrings(s Seq[string], sep string) string","desc":"Join a string sequence with sep.","ex":"seq.JoinStrings(seq.Of(\"a\",\"b\"),\"-\") // \"a-b\""},
+ {"sig":"Union[T comparable](seqs ...Seq[T]) Seq[T]","desc":"Union of multiple Seqs (deduplicated); lazy.","ex":"seq.Union(seq.Of(1,2),seq.Of(2,3)).Collect() // [1 2 3]"},
+ {"sig":"Intersect[T comparable](a, b Seq[T]) Seq[T]","desc":"Intersection; lazy.","ex":"seq.Intersect(seq.Of(1,2,3),seq.Of(2,3,4)).Collect() // [2 3]"},
+ {"sig":"Difference[T comparable](a, b Seq[T]) Seq[T]","desc":"Difference: in a but not in b.","ex":"seq.Difference(seq.Of(1,2,3),seq.Of(2)).Collect() // [1 3]"},
+ {"sig":"SymmetricDifference[T comparable](a, b Seq[T]) Seq[T]","desc":"Symmetric difference: in exactly one of the two.","ex":"seq.SymmetricDifference(seq.Of(1,2),seq.Of(2,3)).Collect() // [1 3]"},
+ {"sig":"Max[T cmp.Ordered](s Seq[T]) Optional[T]","desc":"Maximum element; None for empty.","ex":"seq.Max(seq.Of(3,1,2)).OrZero() // 3"},
+ {"sig":"Min[T cmp.Ordered](s Seq[T]) Optional[T]","desc":"Minimum element.","ex":"seq.Min(seq.Of(3,1,2)).OrZero() // 1"},
+ {"sig":"Sum[T Numeric](s Seq[T]) T","desc":"Sum.","ex":"seq.Sum(seq.Of(1,2,3)) // 6"},
+ {"sig":"Product[T Numeric](s Seq[T]) T","desc":"Product.","ex":"seq.Product(seq.Of(2,3,4)) // 24"},
+ {"sig":"Mean[T Numeric](s Seq[T]) float64","desc":"Arithmetic mean.","ex":"seq.Mean(seq.Of(1,2,3,4)) // 2.5"},
+ {"sig":"Sort[T cmp.Ordered](s Seq[T]) Seq[T]","desc":"Natural-order sort (materializes).","ex":"seq.Sort(seq.Of(3,1,2)).Collect() // [1 2 3]"}
+]},
+{"id":"subtype","title":"Constrained subtypes · overview","cnt":"3 entry functions","desc":"Why three subtypes? Because Seq[T] declares T as any at the type level (to preserve zero-cost conversion with the stdlib), while Distinct/Max/Sum require T to satisfy narrower constraints (comparable / cmp.Ordered / Numeric). Go does not currently allow a method to add a narrower constraint to the receiver's type parameter — you cannot write \"func (s Seq[T]) Max() only when T is cmp.Ordered\". The workaround: define three narrower defined types — SeqComparable/SeqOrdered/SeqNumeric — to \"restore\" the constrained operations as chainable methods. The Comparable/Ordered/Numbers entries lift a bare Seq[T] into the matching subtype; the three form a hierarchy Numeric ⊂ Ordered ⊂ Comparable, downgradable step-by-step via .Ordered()/.Comparable(). Note: calling a type-changing op like .Map() on a subtype downgrades back to a bare Seq[T] (since the new T may no longer satisfy the constraint). [See the related proposal below.]","fns":[
+ {"sig":"⚑ Language proposal golang/go#65394 (not accepted, not implemented)","desc":"Titled \"proposal: spec: allow methods on generic structs which meet subset of type constraint\", it proposes allowing a single method of a generic type to add a narrower subset constraint to its type parameter — e.g. making Max() on Seq[T] available only when T satisfies cmp.Ordered. If accepted and implemented, this library would not need the three subtypes SeqComparable/SeqOrdered/SeqNumeric and could expose constrained methods directly on a single Seq[T]. As of now the proposal is still Open (Proposal milestone, tagged LanguageChange/LanguageChangeReview), neither accepted nor implemented — so this library uses the three constrained subtypes as the current viable workaround. Note it is distinct from the \"method-level type parameters\" (golang/go#77273) this library relies on: #77273 introduces new type parameters on methods (like Map[U]), whereas #65394 narrows an existing type parameter.","ex":"// Proposal: https://github.com/golang/go/issues/65394\n// Status: Open, not accepted, not implemented\n// If accepted, the ideal form might be:\n//   func (s Seq[T]) Max() Optional[T]  where T: cmp.Ordered\n// Until then, use a constrained subtype:\nseq.Ordered(seq.Of(3,1,2)).Max().OrZero() // 3"},
+ {"sig":"Comparable[T comparable](s Seq[T]) SeqComparable[T]","desc":"[Entry] Lift to the comparable subtype, unlocking dedup/lookup/set ops/replace and other methods needing ==.","ex":"seq.Comparable(seq.Of(1,1,2)).Distinct().Collect() // [1 2]"},
+ {"sig":"Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]","desc":"[Entry] Lift to the ordered subtype, adding Max/Min/Sort on top of comparable.","ex":"seq.Ordered(seq.Of(3,1,2)).Sort().Collect() // [1 2 3]"},
+ {"sig":"Numbers[T Numeric](s Seq[T]) SeqNumeric[T]","desc":"[Entry] Lift to the numeric subtype, adding Sum/Product/Mean on top of ordered.","ex":"seq.Numbers(seq.Of(1,2,3)).Sum() // 6"}
+]},
+{"id":"comparable","title":"SeqComparable[T]","cnt":"19 methods","desc":"T satisfies comparable (supports == comparison). On top of the bare Seq's lazy transforms, it adds dedup, lookup, set operations, value replacement, and other methods needing equality. All lazy methods return SeqComparable[T] so the chain stays unbroken. Use .Seq() to downgrade back to a bare Seq[T].","fns":[
+ {"sig":"(s SeqComparable[T]) Distinct() SeqComparable[T]","desc":"Deduplicate, keeping first occurrence; lazy.","ex":"seq.Comparable(seq.Of(1,1,2,1)).Distinct().Collect() // [1 2]"},
+ {"sig":"(s SeqComparable[T]) Contains(v T) bool","desc":"Whether v is present (short-circuits, terminal).","ex":"seq.Comparable(seq.Of(1,2,3)).Contains(2) // true"},
+ {"sig":"(s SeqComparable[T]) IndexOf(v T) Optional[int]","desc":"Index of v's first occurrence.","ex":"seq.Comparable(seq.Of(\"a\",\"b\")).IndexOf(\"b\").OrElse(-1) // 1"},
+ {"sig":"(s SeqComparable[T]) CountValues() map[T]int","desc":"Frequency of each unique value.","ex":"seq.Comparable(seq.Of(\"a\",\"a\",\"b\")).CountValues() // {a:2,b:1}"},
+ {"sig":"(s SeqComparable[T]) ToSet() map[T]struct{}","desc":"Materialize into a set.","ex":"seq.Comparable(seq.Of(1,1,2)).ToSet() // {1:{},2:{}}"},
+ {"sig":"(s SeqComparable[T]) Union(others ...SeqComparable[T]) SeqComparable[T]","desc":"Union with other Seqs (deduplicated); lazy.","ex":"seq.Comparable(seq.Of(1,2)).Union(seq.Comparable(seq.Of(2,3))).Collect() // [1 2 3]"},
+ {"sig":"(s SeqComparable[T]) Intersect(other SeqComparable[T]) SeqComparable[T]","desc":"Intersection; lazy.","ex":"seq.Comparable(seq.Of(1,2,3)).Intersect(seq.Comparable(seq.Of(2,3,4))).Collect() // [2 3]"},
+ {"sig":"(s SeqComparable[T]) Difference(other SeqComparable[T]) SeqComparable[T]","desc":"Difference: in self but not in other.","ex":"seq.Comparable(seq.Of(1,2,3)).Difference(seq.Comparable(seq.Of(2))).Collect() // [1 3]"},
+ {"sig":"(s SeqComparable[T]) Equal(other SeqComparable[T]) bool","desc":"Whether element-wise equal to other.","ex":"seq.Comparable(seq.Of(1,2)).Equal(seq.Comparable(seq.Of(1,2))) // true"},
+ {"sig":"(s SeqComparable[T]) Replace(old, new T, n int) SeqComparable[T]","desc":"Lazily replace the first n elements equal to old; n<0 replaces all, n=0 replaces none.","ex":"seq.Comparable(seq.Of(1,2,1,1)).Replace(1,9,2).Collect() // [9 2 9 1]"},
+ {"sig":"(s SeqComparable[T]) ReplaceAll(old, new T) SeqComparable[T]","desc":"Lazily replace all elements equal to old, i.e. Replace(old,new,-1).","ex":"seq.Comparable(seq.Of(1,2,1)).ReplaceAll(1,9).Collect() // [9 2 9]"},
+ {"sig":"(s SeqComparable[T]) Filter(pred) / Reject(pred) SeqComparable[T]","desc":"Filter / inverse filter, preserving the subtype.","ex":"seq.Comparable(seq.Of(1,2,3)).Filter(func(n int)bool{return n>1}).Collect() // [2 3]"},
+ {"sig":"(s SeqComparable[T]) Take(n) / Drop(n) SeqComparable[T]","desc":"Take first n / drop first n, preserving the subtype.","ex":"seq.Comparable(seq.Of(1,2,3)).Take(2).Collect() // [1 2]"},
+ {"sig":"(s SeqComparable[T]) TakeWhile(pred) / DropWhile(pred) SeqComparable[T]","desc":"Take/drop the leading run by predicate, preserving the subtype.","ex":"seq.Comparable(seq.Of(1,2,5)).TakeWhile(func(n int)bool{return n<3}).Collect() // [1 2]"},
+ {"sig":"(s SeqComparable[T]) Peek(f func(T)) SeqComparable[T]","desc":"Side-effect pass-through, preserving the subtype.","ex":"seq.Comparable(seq.Of(1,2)).Peek(func(n int){log.Print(n)}).Collect() // [1 2]"},
+ {"sig":"(s SeqComparable[T]) Seq() Seq[T]","desc":"Downgrade back to a bare Seq[T].","ex":"seq.Comparable(seq.Of(1,2)).Seq().Map(strconv.Itoa).Collect() // [\"1\" \"2\"]"},
+ {"sig":"(s SeqComparable[T]) Collect() []T","desc":"Materialize into a slice (terminal).","ex":"seq.Comparable(seq.Of(1,2)).Collect() // [1 2]"}
+]},
+{"id":"ordered","title":"SeqOrdered[T]","cnt":"21 methods","desc":"T satisfies cmp.Ordered (supports < comparison; covers integers/floats/strings). A superset of SeqComparable — inherits all its capabilities, adding Max/Min/Sort. Lazy methods return SeqOrdered[T]; use .Comparable() to downgrade.","fns":[
+ {"sig":"(s SeqOrdered[T]) Max() Optional[T]","desc":"Maximum element; None for empty.","ex":"seq.Ordered(seq.Of(3,1,2)).Max().OrZero() // 3"},
+ {"sig":"(s SeqOrdered[T]) Min() Optional[T]","desc":"Minimum element.","ex":"seq.Ordered(seq.Of(3,1,2)).Min().OrZero() // 1"},
+ {"sig":"(s SeqOrdered[T]) Sort() SeqOrdered[T]","desc":"Natural-order sort (materializes), preserving the subtype.","ex":"seq.Ordered(seq.Of(3,1,2)).Sort().Collect() // [1 2 3]"},
+ {"sig":"(s SeqOrdered[T]) Distinct() SeqOrdered[T]","desc":"Deduplicate, preserving the ordered subtype.","ex":"seq.Ordered(seq.Of(1,1,2)).Distinct().Sort().Collect() // [1 2]"},
+ {"sig":"(s SeqOrdered[T]) Contains(v) / IndexOf(v)","desc":"Membership test / index lookup (inherited from comparable).","ex":"seq.Ordered(seq.Of(1,2,3)).Contains(2) // true"},
+ {"sig":"(s SeqOrdered[T]) CountValues() / ToSet()","desc":"Frequency count / set materialization.","ex":"seq.Ordered(seq.Of(1,1,2)).CountValues() // {1:2,2:1}"},
+ {"sig":"(s SeqOrdered[T]) Union / Intersect / Difference / Equal","desc":"Set operations and equality, returning/accepting SeqOrdered.","ex":"seq.Ordered(seq.Of(1,2)).Union(seq.Ordered(seq.Of(2,3))).Sort().Collect() // [1 2 3]"},
+ {"sig":"(s SeqOrdered[T]) Filter / Reject / Take / Drop / TakeWhile / DropWhile / Peek","desc":"Full set of lazy transforms, all preserving the SeqOrdered subtype.","ex":"seq.Ordered(seq.Of(3,1,2)).Filter(func(n int)bool{return n>1}).Sort().Collect() // [2 3]"},
+ {"sig":"(s SeqOrdered[T]) Comparable() SeqComparable[T]","desc":"Downgrade to the comparable subtype.","ex":"seq.Ordered(seq.Of(1,2)).Comparable().Distinct().Collect() // [1 2]"},
+ {"sig":"(s SeqOrdered[T]) Collect() []T","desc":"Materialize into a slice (terminal).","ex":"seq.Ordered(seq.Of(2,1)).Collect() // [2 1]"}
+]},
+{"id":"numeric","title":"SeqNumeric[T]","cnt":"23 methods","desc":"T satisfies Numeric (all integer and floating-point types). A superset of SeqOrdered — inherits all its capabilities, adding numeric aggregates Sum/Product/Mean. Lazy methods return SeqNumeric[T]; use .Ordered() to downgrade.","fns":[
+ {"sig":"(s SeqNumeric[T]) Sum() T","desc":"Sum (terminal).","ex":"seq.Numbers(seq.Of(1,2,3)).Sum() // 6"},
+ {"sig":"(s SeqNumeric[T]) Product() T","desc":"Product (terminal).","ex":"seq.Numbers(seq.Of(2,3,4)).Product() // 24"},
+ {"sig":"(s SeqNumeric[T]) Mean() float64","desc":"Arithmetic mean (terminal).","ex":"seq.Numbers(seq.Of(1,2,3,4)).Mean() // 2.5"},
+ {"sig":"(s SeqNumeric[T]) Max() / Min() Optional[T]","desc":"Maximum/minimum element (inherited from ordered); None for empty.","ex":"seq.Numbers(seq.Of(3,1,2)).Max().OrZero() // 3"},
+ {"sig":"(s SeqNumeric[T]) Sort() SeqNumeric[T]","desc":"Sort, preserving the numeric subtype.","ex":"seq.Numbers(seq.Of(3,1,2)).Sort().Sum() // 6"},
+ {"sig":"(s SeqNumeric[T]) Distinct() SeqNumeric[T]","desc":"Deduplicate, preserving the subtype.","ex":"seq.Numbers(seq.Of(1,1,2)).Distinct().Sum() // 3"},
+ {"sig":"(s SeqNumeric[T]) Contains / IndexOf / CountValues / ToSet","desc":"Membership/lookup/frequency/set (inherited from comparable).","ex":"seq.Numbers(seq.Of(1,2,3)).Contains(2) // true"},
+ {"sig":"(s SeqNumeric[T]) Union / Intersect / Difference / Equal","desc":"Set operations and equality.","ex":"seq.Numbers(seq.Of(1,2,3)).Intersect(seq.Numbers(seq.Of(2,3))).Sum() // 5"},
+ {"sig":"(s SeqNumeric[T]) Filter / Reject / Take / Drop / TakeWhile / DropWhile / Peek","desc":"Full set of lazy transforms, all preserving the SeqNumeric subtype.","ex":"seq.Numbers(seq.Range(0,10)).Filter(func(n int)bool{return n%2==0}).Sum() // 20"},
+ {"sig":"(s SeqNumeric[T]) Ordered() SeqOrdered[T]","desc":"Downgrade to the ordered subtype.","ex":"seq.Numbers(seq.Of(3,1)).Ordered().Max() // 3,true"},
+ {"sig":"(s SeqNumeric[T]) Collect() []T","desc":"Materialize into a slice (terminal).","ex":"seq.Numbers(seq.Of(1,2)).Collect() // [1 2]"}
+]},
+{"id":"multi","title":"Multi-sequence combinators","cnt":"9 free functions","desc":"Combine multiple independent Seqs and flatten nesting. Multiple type parameters / nested instantiation cannot be expressed as Seq[T] methods, so these are free functions. (Key-value Seq2 operations are in the next section.)","fns":[
+ {"sig":"Zip[A, B any](a Seq[A], b Seq[B]) Seq2[A, B]","desc":"Pair element-wise, stopping at the shorter; yields a Seq2.","ex":"seq.ToMap(seq.Zip(seq.Of(1,2),seq.Of(\"a\",\"b\"))) // {1:a,2:b}"},
+ {"sig":"ZipWith[A, B, C any](a Seq[A], b Seq[B], f func(A, B) C) Seq[C]","desc":"Pair element-wise and apply f.","ex":"seq.ZipWith(seq.Of(1,2),seq.Of(10,20),func(a,b int)int{return a+b}).Collect() // [11 22]"},
+ {"sig":"ZipMap[K comparable, V any](keys Seq[K], vals Seq[V]) map[K]V","desc":"Pair keys with vals into a map.","ex":"seq.ZipMap(seq.Of(\"a\",\"b\"),seq.Of(1,2)) // {a:1,b:2}"},
+ {"sig":"Zip3[A, B, C any](a, b, c) Seq[Tuple3[A,B,C]]","desc":"Three-way element-wise pairing into a Tuple3.","ex":"seq.Zip3(seq.Of(1),seq.Of(\"a\"),seq.Of(true)).Collect() // [{1 a true}]"},
+ {"sig":"Zip4[A, B, C, D any](a, b, c, d) Seq[Tuple4[A,B,C,D]]","desc":"Four-way element-wise pairing into a Tuple4.","ex":"seq.Zip4(seq.Of(1),seq.Of(\"a\"),seq.Of(true),seq.Of(2.5)).Collect() // [{1 a true 2.5}]"},
+ {"sig":"Unzip[A, B any](s Seq2[A, B]) (Seq[A], Seq[B])","desc":"Split a Seq2 back into two Seqs.","ex":"ks,vs:=seq.Unzip(seq.Zip(seq.Of(1,2),seq.Of(\"a\",\"b\"))) // ks=[1 2],vs=[a b]"},
+ {"sig":"Flatten[T any](s Seq[Seq[T]]) Seq[T]","desc":"Flatten one level of nested Seq.","ex":"seq.Flatten(seq.Of(seq.Of(1,2),seq.Of(3))).Collect() // [1 2 3]"},
+ {"sig":"Concat[T any](seqs ...Seq[T]) Seq[T]","desc":"Concatenate multiple Seqs in order.","ex":"seq.Concat(seq.Of(1),seq.Of(2,3)).Collect() // [1 2 3]"},
+ {"sig":"Interleave[T any](seqs ...Seq[T]) Seq[T]","desc":"Round-robin interleave the elements of each Seq.","ex":"seq.Interleave(seq.Of(1,3),seq.Of(2,4)).Collect() // [1 2 3 4]"}
+]},
+{"id":"seq2","title":"Seq2[K,V] key-value sequences","cnt":"12 methods + 7 funcs","desc":"Seq2[K,V] is a defined type of iter.Seq2[K,V], expressing a stream of key-value pairs (map iteration, indexed iteration, Zip pairing). Also zero-cost convertible — ready to feed into maps.Collect. Entries: FromMap / Zip / Enumerate / Entries / Associate; exits: ToMap / CollectPairs / Keys / Values / Unzip. Pair[A,B] is the element type when converting to/from slices.","fns":[
+ {"sig":"(s Seq2[K,V]) Map[J, U any](f func(K, V) (J, U)) Seq2[J, U]","desc":"Transform both key and value; may change both types.","ex":"seq.Zip(seq.Of(1),seq.Of(\"a\")).Map(func(k int,v string)(string,int){return strconv.Itoa(k),len(v)}) // (\"1\",1)"},
+ {"sig":"(s Seq2[K,V]) MapValues[U any](f func(V) U) Seq2[K, U]","desc":"Transform values only; keys unchanged.","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).MapValues(func(v int)int{return v*10}) // (a,10) (b,20)"},
+ {"sig":"(s Seq2[K,V]) MapKeys[J any](f func(K) J) Seq2[J, V]","desc":"Transform keys only; values unchanged.","ex":"seq.Zip(seq.Of(\"a\"),seq.Of(1)).MapKeys(strings.ToUpper) // (A,1)"},
+ {"sig":"(s Seq2[K,V]) Filter(pred func(K, V) bool) Seq2[K, V]","desc":"Keep pairs satisfying the predicate; lazy.","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).Filter(func(k string,v int)bool{return v>1}) // (b,2)"},
+ {"sig":"(s Seq2[K,V]) Keys() Seq[K]","desc":"Project out all keys into a Seq[K].","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).Keys().Collect() // [a b]"},
+ {"sig":"(s Seq2[K,V]) Values() Seq[V]","desc":"Project out all values into a Seq[V].","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).Values().Collect() // [1 2]"},
+ {"sig":"(s Seq2[K,V]) ForEach(f func(K, V))","desc":"Call f on each key-value pair (terminal).","ex":"seq.Zip(seq.Of(\"a\"),seq.Of(1)).ForEach(func(k string,v int){fmt.Println(k,v)}) // a 1"},
+ {"sig":"(s Seq2[K,V]) Fold[U any](init U, f func(U, K, V) U) U","desc":"Fold pairs from an initial value; may change the accumulator type.","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).Fold(0,func(acc int,k string,v int)int{return acc+v}) // 3"},
+ {"sig":"(s Seq2[K,V]) Count() int","desc":"Number of key-value pairs (terminal).","ex":"seq.FromMap(map[string]int{\"a\":1,\"b\":2}).Count() // 2"},
+ {"sig":"(s Seq2[K,V]) Find(pred func(K, V) bool) Optional[Pair[K,V]]","desc":"First pair satisfying the predicate; Some(Pair{k,v}) on hit, None otherwise (short-circuits, terminal).","ex":"p,_:=seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).Find(func(k string,v int)bool{return v==2}).Get() // p={b 2}"},
+ {"sig":"(s Seq2[K,V]) Any(pred func(K, V) bool) bool","desc":"Whether any pair satisfies the predicate (short-circuits).","ex":"seq.Zip(seq.Of(\"a\"),seq.Of(1)).Any(func(k string,v int)bool{return v>0}) // true"},
+ {"sig":"(s Seq2[K,V]) All(pred func(K, V) bool) bool","desc":"Whether all pairs satisfy the predicate (short-circuits).","ex":"seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2)).All(func(k string,v int)bool{return v>0}) // true"},
+ {"sig":"FromMap[K comparable, V any](m map[K]V) Seq2[K, V]","desc":"[Entry] Build a Seq2 from a map; order follows Go map range (nondeterministic).","ex":"seq.FromMap(map[string]int{\"a\":1}).Count() // 1"},
+ {"sig":"Zip[A, B any](a Seq[A], b Seq[B]) Seq2[A, B]","desc":"[Entry] Pair two Seqs element-wise into a Seq2, stopping at the shorter.","ex":"seq.ToMap(seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2))) // {a:1,b:2}"},
+ {"sig":"Entries[K, V any](pairs []Pair[K, V]) Seq2[K, V]","desc":"[Entry] Build a Seq2 from a Pair slice (inverse of CollectPairs).","ex":"seq.Entries([]seq.Pair[int,string]{{1,\"a\"}}).Count() // 1"},
+ {"sig":"Associate[T any, K comparable, V any](s Seq[T], f func(T) (K, V)) Seq2[K, V]","desc":"[Entry] Produce a key-value pair from each element to form a Seq2.","ex":"seq.ToMap(seq.Associate(seq.Of(\"go\"),func(s string)(string,int){return s,len(s)})) // {go:2}"},
+ {"sig":"ToMap[K comparable, V any](s Seq2[K, V]) map[K]V","desc":"[Exit] Materialize into a map; later duplicate keys overwrite.","ex":"seq.ToMap(seq.Zip(seq.Of(\"a\",\"b\"),seq.Of(1,2))) // {a:1,b:2}"},
+ {"sig":"CollectPairs[K, V any](s Seq2[K, V]) []Pair[K, V]","desc":"[Exit] Materialize into a Pair slice, preserving order.","ex":"seq.CollectPairs(seq.Zip(seq.Of(1,2),seq.Of(\"a\",\"b\"))) // [{1 a} {2 b}]"},
+ {"sig":"Unzip[A, B any](s Seq2[A, B]) (Seq[A], Seq[B])","desc":"[Exit] Split a Seq2 back into two parallel Seqs.","ex":"ks,vs:=seq.Unzip(seq.Zip(seq.Of(1,2),seq.Of(\"a\",\"b\"))) // ks=[1 2],vs=[a b]"}
+]},
+{"id":"optional","title":"Optional[T]","cnt":"3 ctors + methods + 1 func","desc":"A zero-dependency type expressing \"may have no result\". All terminal operations that may yield nothing (Find/First/Last/Nth/Reduce/MaxBy/Max/Min, index ops FindIndex/IndexOf, etc.) now return Optional directly and can be chained; use .Get() to return to Go's idiomatic (T,bool). Seq2.Find returns Optional[Pair[K,V]].","fns":[
+ {"sig":"Some[T any](v T) Optional[T]","desc":"Construct an Optional holding a value.","ex":"seq.Some(42).IsPresent() // true"},
+ {"sig":"None[T any]() Optional[T]","desc":"Construct an empty Optional (equivalent to the zero value).","ex":"seq.None[int]().IsEmpty() // true"},
+ {"sig":"ToOptional[T any](v T, ok bool) Optional[T]","desc":"Bridge a legacy (value, ok) pair into an Optional (terminal ops already return Optional, so usually unneeded).","ex":"seq.ToOptional(42, true).OrZero() // 42"},
+ {"sig":"(o Optional[T]) Get() (T, bool)","desc":"Get value and presence, returning to Go's idiomatic (T,bool).","ex":"seq.Of(3,1,2).Max().Get() // 3,true"},
+ {"sig":"(o Optional[T]) OrElse(fallback T) T","desc":"Return the value when present, else the fallback.","ex":"seq.None[int]().OrElse(9) // 9"},
+ {"sig":"(o Optional[T]) Unwrap() T","desc":"Get the value, panicking when empty (Rust-style).","ex":"seq.Some(7).Unwrap() // 7"},
+ {"sig":"(o Optional[T]) UnwrapOrElse(f func() T) T","desc":"Lazily call f for the fallback when empty.","ex":"seq.None[int]().UnwrapOrElse(func()int{return 42}) // 42"},
+ {"sig":"(o Optional[T]) Map(f func(T) T) Optional[T]","desc":"Transform when present (same type, no HKT limitation).","ex":"seq.Some(3).Map(func(n int)int{return n*2}) // Some(6)"},
+ {"sig":"(o Optional[T]) Filter(pred func(T) bool) Optional[T]","desc":"Becomes None if the predicate fails.","ex":"seq.Some(3).Filter(func(n int)bool{return n>5}) // None"},
+ {"sig":"(o Optional[T]) FlatMap(f func(T) Optional[T]) Optional[T]","desc":"Monadic bind; presence determined by f.","ex":"seq.Some(8).FlatMap(half) // Some(4)"},
+ {"sig":"MapOptional[T, U any](o Optional[T], f func(T) U) Optional[U]","desc":"Cross-type transform (package-level complement to Map).","ex":"seq.MapOptional(seq.Some(42),strconv.Itoa) // Some(\"42\")"}
+]},
+{"id":"funcs","title":"Operators & predicate builders","cnt":"13","desc":"Ready-made binary operators and predicate builders that save writing anonymous functions by hand — feed them directly into Reduce/Filter etc.","fns":[
+ {"sig":"Add / Sub / Mul[T Numeric](a, b T) T","desc":"Add/subtract/multiply binary operators.","ex":"seq.Of(1,2,3).Reduce(seq.Add[int]) // 6,true"},
+ {"sig":"Max2 / Min2[T cmp.Ordered](a, b T) T","desc":"Binary max/min.","ex":"seq.Of(3,1,2).Reduce(seq.Max2[int]) // 3,true"},
+ {"sig":"Eq / Ne[T comparable](v T) func(T) bool","desc":"Build an \"equals/not-equals v\" predicate.","ex":"seq.Of(1,2,1).Filter(seq.Eq(1)).Count() // 2"},
+ {"sig":"Gt / Ge / Lt / Le[T cmp.Ordered](v T) func(T) bool","desc":"Build greater-than/at-least/less-than/at-most predicates.","ex":"seq.Range(0,5).Filter(seq.Gt(2)).Collect() // [3 4]"},
+ {"sig":"Not[T any](p func(T) bool) func(T) bool","desc":"Negate a predicate.","ex":"seq.Range(0,4).Filter(seq.Not(seq.Gt(1))).Collect() // [0 1]"},
+ {"sig":"Identity[T any](x T) T","desc":"Identity function.","ex":"seq.Of(1,2).Map(seq.Identity[int]).Collect() // [1 2]"}
+]},
+{"id":"outlook","title":"Outlook · lightweight function literals","cnt":"language proposal","desc":"This library is a functional pipeline — nearly every operation takes a callback (Map/Filter/Reduce/FlatMap…). Go's current anonymous-function syntax is verbose — you must spell out func, parameter types, return type, and return — which is the biggest source of visual noise in chained calls. One language proposal, if it lands, would greatly simplify this library's call sites.","fns":[
+ {"sig":"⚑ Language proposal golang/go#21498 · short function literals (Open, not implemented)","desc":"Titled \"proposal: spec: short function literals\", it proposes a lightweight anonymous-function syntax where parameter and return types are inferred from context, dropping the func/type-annotation/return boilerplate — Go's take on a lambda. The author explicitly notes the concrete syntax is not locked (the |x,y| below is illustrative only). Open since 2017 with ~a thousand comments; a small group converged on a \"feasible syntax\" in mid-2024, but as of now it remains Open (Proposal milestone, LanguageChange/LanguageChangeReview tags), neither accepted nor implemented.","ex":"// Proposal: https://github.com/golang/go/issues/21498\n// Status: Open, not accepted, not implemented"},
+ {"sig":"Prediction: once lambdas land, calls here get much simpler","desc":"Once lightweight function literals enter Go, every callback in this library could shed its func/type/return boilerplate. Chained pipelines would go from being \"chopped up by func(x int) bool { return … }\" to almost pure business logic — readability approaching collection chains in Rust/Scala. Below compares current vs future writing with the illustrative syntax |x| expr.","ex":"// —— now ——\nseq.From(xs).\n    Filter(func(n int) bool { return n%2 == 0 }).\n    Map(func(n int) int { return n * n }).\n    Reduce(func(a, b int) int { return a + b }).\n    OrZero()\n\n// —— once lambdas land (illustrative) ——\nseq.From(xs).\n    Filter(|n| n%2 == 0).\n    Map(|n| n*n).\n    Reduce(|a, b| a+b).\n    OrZero()\n\n// Incidentally, the operators/predicate builders in funcs.go\n// (Add/Gt/Eq/Not) that exist mainly to \"avoid writing closures\"\n// would lose value too — hand-written lambdas would be light enough by then."}
+]}
+]}
+</script>
+<script>
+const data = JSON.parse(document.getElementById('data').textContent);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function hl(code){
+  let h = esc(code);
+  h = h.replace(/(\/\/[^\n]*)$/gm, '<span class="com">$1</span>');
+  h = h.replace(/(&quot;[^&]*?&quot;)/g, '<span class="str">$1</span>');
+  h = h.replace(/(https?:\/\/[^\s<]+)/g, m => ` LINK ${m} /LINK `);
+  h = h.replace(/\b(func|return|int|bool|string|float64|range|for|if|struct|where)\b/g, '<span class="kw">$1</span>');
+  h = h.replace(/\b(\d+(?:\.\d+)?)\b/g, (m, d, off, str) => {
+    const before = str.slice(0, off);
+    const open = before.lastIndexOf(' LINK ');
+    const close = before.lastIndexOf(' /LINK ');
+    if (open > close) return m;
+    return `<span class="num">${d}</span>`;
+  });
+  h = h.replace(/ LINK ([\s\S]*?) \/LINK /g,
+    '<a href="$1" target="_blank" rel="noopener" class="ex-link">$1</a>');
+  return h;
+}
+
+const nav = document.getElementById('nav');
+const content = document.getElementById('content');
+
+data.groups.forEach(g => {
+  const na = document.createElement('div');
+  na.className = 'nav-group';
+  na.innerHTML = `<a href="#${g.id}">${g.title} <span class="count">${g.fns.length}</span></a>`;
+  nav.appendChild(na);
+
+  const sec = document.createElement('section');
+  sec.id = g.id;
+  let html = `<div class="sec-head"><h3>${esc(g.title)}</h3><span class="cnt">${esc(g.cnt)}</span></div>`;
+  html += `<p class="sec-desc">${esc(g.desc)}</p>`;
+  g.fns.forEach(fn => {
+    const isNote = fn.sig.startsWith('⚑');
+    html += `<div class="fn${isNote ? ' fn-note' : ''}">
+      <div class="fn-sig">${esc(fn.sig)}</div>
+      <div class="fn-desc">${esc(fn.desc)}</div>
+      <pre>${hl(fn.ex)}</pre>
+    </div>`;
+  });
+  sec.innerHTML = html;
+  content.appendChild(sec);
+});
+
+const total = data.groups.reduce((n,g)=>n+g.fns.length,0);
+document.title = `seq — ${total}+ ops · Go 1.27`;
+
+document.querySelectorAll('.lang-switch a').forEach(a => {
+  a.addEventListener('click', () => {
+    try { localStorage.setItem('seq-docs-lang', a.getAttribute('href') === 'zh.html' ? 'zh' : 'en'); } catch (e) {}
+  });
+});
+</script>
+</body>
+</html>
