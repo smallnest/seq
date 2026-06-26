@@ -212,7 +212,7 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"Ordered[T cmp.Ordered](s Seq[T]) SeqOrdered[T]","desc":"【入口】升级为 ordered 子类型，在 comparable 基础上再解锁 Max/Min/Sort。","ex":"seq.Ordered(seq.Of(3,1,2)).Sort().Collect() // [1 2 3]"},
  {"sig":"Numbers[T Numeric](s Seq[T]) SeqNumeric[T]","desc":"【入口】升级为 numeric 子类型，在 ordered 基础上再解锁 Sum/Product/Mean。","ex":"seq.Numbers(seq.Of(1,2,3)).Sum() // 6"}
 ]},
-{"id":"comparable","title":"SeqComparable[T] · comparable","cnt":"19 个方法","desc":"T 满足 comparable（支持 == 比较）。在裸 Seq 的惰性变换之上，额外提供去重、查找、集合运算、按值替换等需要相等比较的方法。所有惰性方法返回 SeqComparable[T]，链不断。用 .Seq() 降级回裸 Seq[T]。","fns":[
+{"id":"comparable","title":"SeqComparable[T]","cnt":"19 个方法","desc":"T 满足 comparable（支持 == 比较）。在裸 Seq 的惰性变换之上，额外提供去重、查找、集合运算、按值替换等需要相等比较的方法。所有惰性方法返回 SeqComparable[T]，链不断。用 .Seq() 降级回裸 Seq[T]。","fns":[
  {"sig":"(s SeqComparable[T]) Distinct() SeqComparable[T]","desc":"去重，保留首次出现，惰性。","ex":"seq.Comparable(seq.Of(1,1,2,1)).Distinct().Collect() // [1 2]"},
  {"sig":"(s SeqComparable[T]) Contains(v T) bool","desc":"是否包含 v（短路，终端）。","ex":"seq.Comparable(seq.Of(1,2,3)).Contains(2) // true"},
  {"sig":"(s SeqComparable[T]) IndexOf(v T) Optional[int]","desc":"v 首次出现的下标。","ex":"seq.Comparable(seq.Of(\"a\",\"b\")).IndexOf(\"b\").OrElse(-1) // 1"},
@@ -231,7 +231,7 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"(s SeqComparable[T]) Seq() Seq[T]","desc":"降级回裸 Seq[T]。","ex":"seq.Comparable(seq.Of(1,2)).Seq().Map(strconv.Itoa).Collect() // [\"1\" \"2\"]"},
  {"sig":"(s SeqComparable[T]) Collect() []T","desc":"物化为切片（终端）。","ex":"seq.Comparable(seq.Of(1,2)).Collect() // [1 2]"}
 ]},
-{"id":"ordered","title":"SeqOrdered[T] · cmp.Ordered","cnt":"21 个方法","desc":"T 满足 cmp.Ordered（支持 < 比较，含整数/浮点/字符串）。是 SeqComparable 的超集——继承其全部能力，再加 Max/Min/Sort。惰性方法返回 SeqOrdered[T]；用 .Comparable() 降级。","fns":[
+{"id":"ordered","title":"SeqOrdered[T]","cnt":"21 个方法","desc":"T 满足 cmp.Ordered（支持 < 比较，含整数/浮点/字符串）。是 SeqComparable 的超集——继承其全部能力，再加 Max/Min/Sort。惰性方法返回 SeqOrdered[T]；用 .Comparable() 降级。","fns":[
  {"sig":"(s SeqOrdered[T]) Max() Optional[T]","desc":"最大元素，空序列 None。","ex":"seq.Ordered(seq.Of(3,1,2)).Max().OrZero() // 3"},
  {"sig":"(s SeqOrdered[T]) Min() Optional[T]","desc":"最小元素。","ex":"seq.Ordered(seq.Of(3,1,2)).Min().OrZero() // 1"},
  {"sig":"(s SeqOrdered[T]) Sort() SeqOrdered[T]","desc":"自然序排序（需物化），保持子类型。","ex":"seq.Ordered(seq.Of(3,1,2)).Sort().Collect() // [1 2 3]"},
@@ -243,7 +243,7 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"(s SeqOrdered[T]) Comparable() SeqComparable[T]","desc":"降级到 comparable 子类型。","ex":"seq.Ordered(seq.Of(1,2)).Comparable().Distinct().Collect() // [1 2]"},
  {"sig":"(s SeqOrdered[T]) Collect() []T","desc":"物化为切片（终端）。","ex":"seq.Ordered(seq.Of(2,1)).Collect() // [2 1]"}
 ]},
-{"id":"numeric","title":"SeqNumeric[T] · Numeric","cnt":"23 个方法","desc":"T 满足 Numeric（所有整数与浮点类型）。是 SeqOrdered 的超集——继承全部能力，再加数值聚合 Sum/Product/Mean。惰性方法返回 SeqNumeric[T]；用 .Ordered() 降级。","fns":[
+{"id":"numeric","title":"SeqNumeric[T]","cnt":"23 个方法","desc":"T 满足 Numeric（所有整数与浮点类型）。是 SeqOrdered 的超集——继承全部能力，再加数值聚合 Sum/Product/Mean。惰性方法返回 SeqNumeric[T]；用 .Ordered() 降级。","fns":[
  {"sig":"(s SeqNumeric[T]) Sum() T","desc":"求和（终端）。","ex":"seq.Numbers(seq.Of(1,2,3)).Sum() // 6"},
  {"sig":"(s SeqNumeric[T]) Product() T","desc":"求积（终端）。","ex":"seq.Numbers(seq.Of(2,3,4)).Product() // 24"},
  {"sig":"(s SeqNumeric[T]) Mean() float64","desc":"算术均值（终端）。","ex":"seq.Numbers(seq.Of(1,2,3,4)).Mean() // 2.5"},
