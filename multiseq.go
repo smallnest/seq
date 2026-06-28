@@ -4,10 +4,26 @@ import (
 	"iter"
 )
 
-// Multi-sequence / nested free functions. These take multiple independent
-// generator types or a specifically-instantiated receiver (Seq[Seq[T]]), which
-// cannot be expressed as methods on Seq[T any] — hence free functions
-// (划分铁律: 多类型参数 / 嵌套实例化).
+// Multi-sequence combinators, kept as free functions. Of these, only Flatten is
+// forced out by the language: a Seq[Seq[T]] receiver is illegal — a receiver's
+// type argument must be an identifier, not Seq[T]. The Zip family pairs two
+// independent sources; its natural method form (Seq[T]).Zip[R](Seq[R])
+// Seq[Pair[T,R]] hits an instantiation cycle (re-instantiating Seq with an
+// argument that deforms T — Pair[T,R] — never terminates), so it cannot return
+// the same defined type — returning Seq2 / the underlying iter.Seq would compile
+// and stay lazy.
+//
+// Two distinct Go "cycle" restrictions are in play, both still rejecting this on
+// go1.27rc1: (1) #75883 (Go 1.26) LIFTED only the self-referential *constraint*
+// rule (type T[P T[P]]); it does not help here, since Seq's T is constrained to
+// any. (2) The monomorphization circuit breaker: Go generates all methods for
+// each instantiation, so a method returning A[A[T]] forces A[A[T]]'s methods →
+// A[A[A[int]]] → … ad infinitum. #80109 closed that self-nesting form
+// (A[A[T]]) as "working as intended". Zip's Seq[Pair[T,R]] is the *derived but
+// non-self-nesting* form tracked by #80172 (still OPEN, no Go-team ruling): the
+// equivalent free function compiles, so whether this sub-case is truly intended
+// is unsettled. Either way it does not compile today; the Zip family stays free
+// for source symmetry (划分铁律: 多源组合 / 嵌套实例化).
 
 // Zip pairs elements of a and b position-wise, stopping when the shorter
 // sequence is exhausted. Yields Pair[A, B].

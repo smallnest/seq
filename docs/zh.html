@@ -276,7 +276,7 @@ seq.From([]<span class="kw">int</span>{<span class="num">1</span>, <span class="
  {"sig":"(s SeqNumeric[T]) Ordered() SeqOrdered[T]","desc":"降级到 ordered 子类型。","ex":"seq.Numbers(seq.Of(3,1)).Ordered().Max() // 3,true"},
  {"sig":"(s SeqNumeric[T]) Collect() []T","desc":"物化为切片（终端）。","ex":"seq.Numbers(seq.Of(1,2)).Collect() // [1 2]"}
 ]},
-{"id":"multi","title":"多序列组合","cnt":"9 个自由函数","desc":"组合多个独立 Seq、嵌套展平。多类型参数/嵌套实例化无法表达为 Seq[T] 方法，故为自由函数。（键值对 Seq2 的操作见下一节。）","fns":[
+{"id":"multi","title":"多序列组合","cnt":"9 个自由函数","desc":"组合多个独立 Seq、嵌套展平。仅 Flatten 受语言所限（Seq[Seq[T]] 接收者非法——接收者类型实参须为标识符）；Zip 族取自由函数形式以保持多源对称。Zip/Zip3/Zip4 不能返回同一定义类型 Seq[Pair[…]]/Seq[Tuple…]——会触发实例化循环（go1.27rc1，`T instantiated as Pair[T,R]`）。分两类：自嵌套形（Seq[Seq[T]]，golang/go#80109 已判 working as intended）与派生非自嵌套形（Seq[Pair[T,R]]，golang/go#80172 仍 OPEN 未定论——等价自由函数可编译）。返回 Seq2/iter.Seq 可编译且惰性。（键值对 Seq2 的操作见下一节。）","fns":[
  {"sig":"Zip[A, B any](a Seq[A], b Seq[B]) Seq2[A, B]","desc":"按位配对，止于较短者，产出 Seq2。","ex":"seq.ToMap(seq.Zip(seq.Of(1,2),seq.Of(\"a\",\"b\"))) // {1:a,2:b}"},
  {"sig":"ZipWith[A, B, C any](a Seq[A], b Seq[B], f func(A, B) C) Seq[C]","desc":"按位配对并应用 f。","ex":"seq.ZipWith(seq.Of(1,2),seq.Of(10,20),func(a,b int)int{return a+b}).Collect() // [11 22]"},
  {"sig":"ZipMap[K comparable, V any](keys Seq[K], vals Seq[V]) map[K]V","desc":"keys 与 vals 配对成 map。","ex":"seq.ZipMap(seq.Of(\"a\",\"b\"),seq.Of(1,2)) // {a:1,b:2}"},

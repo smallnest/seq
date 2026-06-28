@@ -53,7 +53,7 @@
 
 ### 1.3 ⚠ 偏差：`Chunk` / `Window`（返回 `iter.Seq[Seq[T]]`）
 
-> **签名偏差**：PRD 原定 `Chunk(size int) Seq[Seq[T]]` 与 `Window(size, step int) Seq[Seq[T]]`。Go 1.27rc1 禁止 `Seq[T]` 上的泛型方法实例化 `Seq[Seq[T]]`（instantiation cycle: `T` instantiated as `Seq[T]`）。故二者返回底层 `iter.Seq[Seq[T]]`，**内层为完整 `Seq[T]`（可继续方法链）**；如需对外层继续链式，用零成本包装 `Seq[Seq[T]](s.Chunk(n))`。详见 issue #6 笔记。
+> **签名偏差**：PRD 原定 `Chunk(size int) Seq[Seq[T]]` 与 `Window(size, step int) Seq[Seq[T]]`。Go 1.27rc1 禁止 `Seq[T]` 上的泛型方法实例化 `Seq[Seq[T]]`（instantiation cycle: `T` instantiated as `Seq[T]`）。这是**自嵌套**形实例化循环（golang/go#80109，Griesemer 判 working as intended：单态化生成全部方法，`A[int]`→`A[A[int]]`→… 无穷展开，论证成立），故预期**不会**随稳定版恢复为 `Seq[Seq[T]]`。二者返回底层 `iter.Seq[Seq[T]]`，**内层为完整 `Seq[T]`（可继续方法链）**；如需对外层继续链式，用零成本包装 `Seq[Seq[T]](s.Chunk(n))`。详见 issue #6 笔记。
 
 | 方法 | 语义 |
 |---|---|
@@ -131,7 +131,7 @@
 
 ## 三、自由函数
 
-> **划分铁律**：凡约束元素类型 `T` 本身（`comparable` / `cmp.Ordered` / `Numeric`）、涉及多个独立类型参数、或接收者须为特定实例化（如 `Seq[Seq[T]]`）的操作，**只能是自由函数**。下表每条注明其无法成为方法的理由类别。
+> **划分铁律**：凡约束元素类型 `T` 本身（`comparable` / `cmp.Ordered` / `Numeric`）、或接收者须为特定实例化（如 `Seq[Seq[T]]`，接收者类型实参须为标识符）的操作，语言层面无法成为 `Seq[T]` 方法，故只能是自由函数。多源组合器（Zip 族、`Concat`、`Interleave`）在 1.27 下可带类型参数写成方法，取自由函数形式是为多源对称；其中 `Zip`/`Zip3`/`Zip4` 若返回同一定义类型 `Seq[Pair[…]]`/`Seq[Tuple…]` 会触发实例化循环（go1.27rc1 实测，`T instantiated as Pair[T,R]`），须返回 `Seq2`/底层 `iter.Seq`。该循环分两类（详见末节「工具链说明」）：**自嵌套**形（`Seq[Seq[T]]`，golang/go#80109 已判 working as intended）与**派生非自嵌套**形（`Seq[Pair[T,R]]`，golang/go#80172 仍 OPEN、无 Go 团队裁决，等价自由函数可编译）。下表每条注明理由。
 
 ### 3.1 构造入口（FR-2）—— 无接收者，故均为函数
 
@@ -174,18 +174,18 @@
 | `ToSet[T comparable](s Seq[T]) map[T]struct{}` | 转集合 | 空 map |
 | `JoinStrings(s Seq[string], sep string) string` | 字符串序列拼接 | `""` |
 
-### 3.3 多序列 / 嵌套自由函数（FR-6）—— 多类型参数或嵌套实例化，故不能是方法
+### 3.3 多序列 / 嵌套自由函数（FR-6）—— 嵌套实例化不可为方法；多源组合取函数形式
 
-| 函数 | 语义 | 为何不是方法 |
+| 函数 | 语义 | 为何取自由函数形式 |
 |---|---|---|
-| `Zip[A, B any](a Seq[A], b Seq[B]) Seq2[A, B]` | 配对两序列，短者止 | 两个独立类型参数 |
-| `ZipWith[A, B, C any](a Seq[A], b Seq[B], f func(A, B) C) Seq[C]` | 配对并用 `f` 合并 | 多个独立类型参数 |
-| `ZipMap[K comparable, V any](keys Seq[K], vals Seq[V]) map[K]V` | 两序列配成 map（同 key 后者覆盖） | 多类型参数 + 约束 K |
-| `Zip3[A, B, C any](a, b, c) Seq[Tuple3[A,B,C]]` | 三路配对 | 多类型参数 |
-| `Zip4[A, B, C, D any](...) Seq[Tuple4[A,B,C,D]]` | 四路配对 | 多类型参数 |
-| `Unzip[A, B any](s Seq2[A, B]) (Seq[A], Seq[B])` | 拆分 `Seq2` 为两序列（物化一次，两侧均可重复遍历） | 多返回类型 |
-| `Flatten[T any](s Seq[Seq[T]]) Seq[T]` | 展平一层嵌套 | 接收者须为 `Seq[Seq[T]]` 实例化 |
-| `Concat[T any](seqs ...Seq[T]) Seq[T]` | 顺序拼接多序列（变参版） | 变参聚合 |
+| `Zip[A, B any](a Seq[A], b Seq[B]) Seq2[A, B]` | 配对两序列，短者止 | 多源对称；若为方法返 `Seq[Pair[T,R]]` 触发实例化循环（#80172，未定论；返 `Seq2` 可） |
+| `ZipWith[A, B, C any](a Seq[A], b Seq[B], f func(A, B) C) Seq[C]` | 配对并用 `f` 合并 | 多源对称（返 `Seq[C]` 可为方法） |
+| `ZipMap[K comparable, V any](keys Seq[K], vals Seq[V]) map[K]V` | 两序列配成 map（同 key 后者覆盖） | 终止物化 + 约束 K |
+| `Zip3[A, B, C any](a, b, c) Seq[Tuple3[A,B,C]]` | 三路配对 | 多源对称；自引用返回实例化循环（#80172 类） |
+| `Zip4[A, B, C, D any](...) Seq[Tuple4[A,B,C,D]]` | 四路配对 | 多源对称；自引用返回实例化循环（#80172 类） |
+| `Unzip[A, B any](s Seq2[A, B]) (Seq[A], Seq[B])` | 拆分 `Seq2` 为两序列（物化一次，两侧均可重复遍历） | 多源对称（可为方法） |
+| `Flatten[T any](s Seq[Seq[T]]) Seq[T]` | 展平一层嵌套 | 接收者类型实参须为标识符（语言不可） |
+| `Concat[T any](seqs ...Seq[T]) Seq[T]` | 顺序拼接多序列（变参版） | 变参聚合；另有 2 源方法 `Concat` |
 | `Interleave[T any](seqs ...Seq[T]) Seq[T]` | 轮流交错取元素（跳过已耗尽者，直至全部耗尽） | 变参聚合 |
 
 ### 3.4 `Seq2` 配套自由函数（FR-7b）—— 约束 K，故为函数
@@ -274,4 +274,4 @@ sum := seq.Numbers(seq.From([]int{1, 2, 2, 3})).Distinct().Sum()
 
 - `go build ./...` / `go vet ./...` / `go test ./...` 全部通过
 - `gofmt -l` 对**泛型方法**签名行报 `method must have no type parameters` —— 这是 go1.27rc1 的 **formatter/parser 误报**（编译器接受、vet/test 通过），非代码缺陷。稳定版 1.27 发布后应消失；当前对这些文件以肉眼核对格式
-- `Chunk`/`Window` 的 `iter.Seq[Seq[T]]` 返回类型偏差：待稳定版 1.27 验证是否可恢复为 `Seq[Seq[T]]`（见 issue #6 笔记）
+- `Chunk`/`Window` 的 `iter.Seq[Seq[T]]` 返回类型偏差：属自嵌套实例化循环（golang/go#80109，已判 working as intended），预期不会恢复为 `Seq[Seq[T]]`（见 issue #6 笔记）
